@@ -1,0 +1,157 @@
+# Dify工作流导出器配置文件
+# 请根据您的实际情况选择和配置连接方式
+
+# 数据源配置 - 选择一种数据源方式
+# 可选值: 'database', 'api', 'manual'
+data_source: 'database'
+
+# 数据库连接配置 (当data_source为'database'时使用)
+database:
+  # 数据库类型，目前支持 postgresql
+  type: 'postgresql'
+  
+  # 数据库连接信息
+  host: 'localhost'
+  port: 5432
+  database: 'dify'
+  username: 'postgres'
+  password: 'password'
+  
+  # 连接池配置
+  pool_size: 10
+  max_overflow: 20
+  pool_timeout: 30
+  
+  # SSL配置
+  ssl_mode: 'prefer'  # disable, allow, prefer, require
+  
+  # 表名配置 (如果Dify使用了自定义表名)
+  tables:
+    apps: 'apps'
+    workflows: 'workflows'
+    app_environment_variables: 'app_environment_variables'
+    workflow_nodes: 'workflow_nodes'
+    workflow_edges: 'workflow_edges'
+
+# API连接配置 (当data_source为'api'时使用)
+api:
+  # Dify API基础URL
+  base_url: 'http://localhost:5001'
+  
+  # API认证方式
+  auth:
+    type: 'bearer'  # bearer, basic, api_key
+    token: 'your_api_token_here'  # 用于bearer认证
+    # username: 'admin'  # 用于basic认证
+    # password: 'password'  # 用于basic认证
+    # api_key: 'your_api_key'  # 用于api_key认证
+    # api_key_header: 'X-API-Key'  # API密钥头名称
+  
+  # API端点配置
+  endpoints:
+    apps: '/api/apps/{app_id}'
+    workflows: '/api/apps/{app_id}/workflows/draft'
+    environment_variables: '/api/apps/{app_id}/env-variables'
+  
+  # 请求配置
+  timeout: 30
+  retry_count: 3
+  retry_delay: 1
+
+# 手动导入配置 (当data_source为'manual'时使用)
+manual:
+  # 数据存储方式
+  storage_type: 'file'  # file, memory
+  
+  # 文件存储配置
+  file_storage:
+    # 数据文件存储目录
+    data_dir: './data'
+    # 支持的文件格式
+    supported_formats: ['json', 'yaml', 'yml']
+    # 自动备份
+    auto_backup: true
+    backup_dir: './data/backups'
+  
+  # 内存存储配置
+  memory_storage:
+    # 最大存储条目数
+    max_entries: 1000
+    # 数据过期时间(秒)
+    expire_time: 3600
+
+# 导出配置
+export:
+  # 默认导出格式
+  default_format: 'yaml'
+  
+  # 输出文件命名规则
+  filename_template: 'workflow-{app_id}-{timestamp}.{format}'
+  
+  # 是否包含敏感信息的默认值
+  include_secrets_default: false
+  
+  # 支持的导出格式
+  supported_formats: ['yaml', 'json']
+  
+  # 压缩配置
+  compression:
+    enabled: false
+    format: 'zip'  # zip, gz, tar
+
+# 日志配置
+logging:
+  level: 'INFO'  # DEBUG, INFO, WARNING, ERROR
+  file: 'logs/app.log'
+  max_size: '10MB'
+  backup_count: 5
+  format: '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+
+# 安全配置
+security:
+  # 加密敏感配置
+  encrypt_config: false
+  encryption_key: 'your_encryption_key_here'
+  
+  # 允许的IP地址 (空表示允许所有)
+  allowed_ips: []
+  
+  # API访问限制
+  rate_limit:
+    enabled: true
+    requests_per_minute: 60
+
+# 缓存配置
+cache:
+  enabled: true
+  type: 'memory'  # memory, redis, file
+  ttl: 300  # 缓存过期时间(秒)
+  
+  # Redis配置 (当type为'redis'时使用)
+  redis:
+    host: 'localhost'
+    port: 6379
+    db: 0
+    password: null
+  
+  # 文件缓存配置 (当type为'file'时使用)
+  file:
+    cache_dir: './cache'
+    max_size: '100MB'
+
+# 环境变量映射 (可以使用环境变量覆盖配置)
+env_mapping:
+  # 数据库配置
+  'database.host': 'DB_HOST'
+  'database.port': 'DB_PORT'
+  'database.database': 'DB_NAME'
+  'database.username': 'DB_USER'
+  'database.password': 'DB_PASSWORD'
+  
+  # API配置
+  'api.base_url': 'DIFY_API_URL'
+  'api.auth.token': 'DIFY_API_TOKEN'
+  
+  # 其他配置
+  'logging.level': 'LOG_LEVEL'
+  'security.encryption_key': 'ENCRYPTION_KEY' 
