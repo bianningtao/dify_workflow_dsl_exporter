@@ -139,11 +139,11 @@ npm run dev
 data_source: 'database'
 database:
   type: 'postgresql'
-  host: '38.55.232.39'        # 数据库主机地址
-  port: 5432                  # 数据库端口
-  database: 'dify'            # 数据库名称
-  username: 'postgres'        # 数据库用户名
-  password: 'difyai123456'    # 数据库密码
+  host: 'your_database_host'     # 数据库主机地址
+  port: 5432                     # 数据库端口
+  database: 'dify'               # 数据库名称
+  username: 'your_username'      # 数据库用户名
+  password: 'your_password'      # 数据库密码
   
   # 可选：连接池配置
   pool_size: 10
@@ -151,7 +151,7 @@ database:
   pool_timeout: 30
   
   # 可选：SSL配置
-  ssl_mode: 'prefer'          # disable, allow, prefer, require
+  ssl_mode: 'prefer'             # disable, allow, prefer, require
 ```
 
 #### 注意事项
