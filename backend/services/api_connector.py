@@ -303,7 +303,7 @@ class APIConnector:
                 return
         else:
             # 使用配置的认证头
-            self.headers = self.config.get_api_headers()
+        self.headers = self.config.get_api_headers()
         
         # 设置会话头部
         self.session.headers.update(self.headers)
@@ -444,12 +444,12 @@ class APIConnector:
                 
                 try:
                     workflow = self.get_workflow_by_app_id(app_info['id'])
-                    if workflow:
+                if workflow:
                         # 确保工作流包含应用名称信息
                         workflow.app_name = app_info['name']
                         workflow.app_description = app_info['description']
                         workflow.app_mode = app_info['mode']
-                        workflows.append(workflow)
+                    workflows.append(workflow)
                         if i <= 5:  # 只显示前5个的成功信息
                             logging.info(f"成功获取工作流: {app_info['name']}")
                     else:
@@ -471,7 +471,7 @@ class APIConnector:
         
         # 暂时禁用环境变量获取以避免404错误
         logging.info(f"跳过环境变量获取 (应用ID: {app_id})")
-        return []
+            return []
     
     def test_connection(self) -> dict:
         """测试API连接是否正常"""
