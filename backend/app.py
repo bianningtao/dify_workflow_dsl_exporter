@@ -2,7 +2,7 @@ from flask import Flask
 from flask_restful import Api
 from flask_cors import CORS
 from controllers.app_controller import AppExportApi
-from controllers.workflow_controller import WorkflowDraftApi, WorkflowListApi, WorkflowBatchExportApi
+from controllers.workflow_controller import WorkflowDraftApi, WorkflowListApi, WorkflowBatchExportApi, WorkflowRefreshApi, ApiTestApi
 from services.config_service import config
 import os
 import logging
@@ -44,6 +44,8 @@ def create_app():
     api.add_resource(WorkflowDraftApi, "/api/apps/<string:app_id>/workflows/draft")
     api.add_resource(WorkflowListApi, "/api/workflows")
     api.add_resource(WorkflowBatchExportApi, "/api/workflows/batch-export")
+    api.add_resource(WorkflowRefreshApi, "/api/workflows/refresh")
+    api.add_resource(ApiTestApi, "/api/test-connection")
     
     return app
 

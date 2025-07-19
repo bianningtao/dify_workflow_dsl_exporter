@@ -55,6 +55,7 @@ export interface WorkflowSummary {
   has_secret_variables: boolean;
   last_modified: string;
   description?: string;
+  app_mode?: string; // 应用模式类型
 }
 
 export interface PaginationInfo {
@@ -69,6 +70,7 @@ export interface PaginationInfo {
 export interface WorkflowListResponse {
   workflows: WorkflowSummary[];
   pagination: PaginationInfo;
+  stats?: Record<string, number>; // 添加全量应用类型统计
 }
 
 export interface WorkflowListParams {

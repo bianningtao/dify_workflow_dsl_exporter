@@ -29,7 +29,7 @@ workflow-dsl-exporter/
 │   │   ├── config_service.py          # 配置服务
 │   │   ├── database_connector.py      # 数据库连接器
 │   │   ├── api_connector.py           # API连接器
-│   │   └── manual_import_service.py   # 手动导入服务
+
 │   └── controllers/            # API 控制器
 │       ├── app_controller.py          # 应用控制器
 │       └── workflow_controller.py     # 工作流控制器
@@ -118,7 +118,7 @@ npm run dev
 ![alt text](images/image.png)
 ## ⚙️ 配置系统
 
-本项目支持三种数据源模式，可以通过配置文件灵活切换：
+本项目支持两种数据源模式，可以通过配置文件灵活切换：
 
 ### 1. 数据库连接模式（推荐）
 
@@ -200,57 +200,7 @@ api:
   retry_delay: 1
 ```
 
-### 3. 手动导入模式
 
-手动上传工作流数据文件。
-
-#### 适用场景
-- 无法直接访问Dify系统
-- 需要离线处理工作流数据
-- 用于测试或演示目的
-
-#### 配置步骤
-
-```yaml
-data_source: 'manual'
-manual:
-  storage_type: 'file'
-  file_storage:
-    data_dir: './data'              # 数据存储目录
-    supported_formats: ['json', 'yaml', 'yml']
-    auto_backup: true               # 自动备份
-    backup_dir: './data/backups'    # 备份目录
-```
-
-#### 数据文件格式
-
-在`./data`目录下创建文件，文件名格式：`{app_id}.{format}`
-
-```yaml
-# data/your-app-id.yaml
-version: '1.0'
-kind: app
-app:
-  name: 您的工作流应用
-  mode: workflow
-  icon: 🚀
-  description: 应用描述
-workflow:
-  version: '1.0'
-  graph:
-    nodes:
-      - id: start
-        type: start
-        data:
-          type: start
-          title: 开始
-    edges: []
-  features: {}
-  environment_variables:
-    - name: API_KEY
-      value: your_api_key
-      value_type: secret
-```
 
 ### 🔐 环境变量配置
 

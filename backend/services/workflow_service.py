@@ -1,11 +1,12 @@
 from typing import Optional, Dict, Any, List
 from models.app import Workflow, EnvironmentVariable, WorkflowNode, WorkflowEdge, App, AppMode
 import uuid
+import logging
 
 from .config_service import config
 from .database_connector import database_connector
 from .api_connector import api_connector
-from .manual_import_service import manual_import_service
+
 
 class WorkflowService:
     # 模拟数据库存储（仅作为fallback）
@@ -22,8 +23,6 @@ class WorkflowService:
             return database_connector.get_workflow_by_app_id(app_id)
         elif config.is_api_enabled():
             return api_connector.get_workflow_by_app_id(app_id)
-        elif config.is_manual_enabled():
-            return manual_import_service.get_workflow_by_app_id(app_id)
         else:
             # 使用内存存储作为fallback
             return self._workflows.get(app_id)
@@ -40,8 +39,6 @@ class WorkflowService:
             workflows = database_connector.get_all_workflows()
         elif config.is_api_enabled():
             workflows = api_connector.get_all_workflows()
-        elif config.is_manual_enabled():
-            workflows = manual_import_service.get_all_workflows()
         else:
             # 使用内存存储作为fallback
             workflows = list(self._workflows.values())
@@ -67,8 +64,6 @@ class WorkflowService:
             app_model = database_connector.get_app_by_id(app_id)
         elif config.is_api_enabled():
             app_model = api_connector.get_app_by_id(app_id)
-        elif config.is_manual_enabled():
-            app_model = manual_import_service.get_app_by_id(app_id)
         
         # 如果没有找到应用，创建一个默认的
         if app_model is None:
@@ -223,6 +218,12 @@ class WorkflowService:
                 return workflow
         return None 
 
+    def clear_cache(self):
+        """清除缓存，强制刷新数据"""
+        if config.is_api_enabled():
+            api_connector.clear_cache()
+            logging.info("工作流服务缓存已清除")
+
     def get_workflows_paginated(self, page: int = 1, page_size: int = 20, search: str = "") -> dict:
         """
         分页获取工作流列表
@@ -236,8 +237,6 @@ class WorkflowService:
             return database_connector.get_workflows_paginated(page, page_size, search)
         elif config.is_api_enabled():
             return api_connector.get_workflows_paginated(page, page_size, search)
-        elif config.is_manual_enabled():
-            return manual_import_service.get_workflows_paginated(page, page_size, search)
         else:
             # 使用内存存储作为fallback
             workflows = list(self._workflows.values())

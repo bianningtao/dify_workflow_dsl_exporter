@@ -2,20 +2,20 @@
 # 复制此文件为 config.yaml 并根据您的实际情况进行配置
 
 # 数据源配置 - 选择一种数据源方式
-# 可选值: 'database', 'api', 'manual'
-data_source: 'database'
+# 可选值: 'database', 'api'
+data_source: api
 
 # 数据库连接配置 (当data_source为'database'时使用)
 database:
   # 数据库类型，目前支持 postgresql
-  type: 'postgresql'
+  type: postgresql
   
   # 数据库连接信息 - 请修改为您的Dify数据库信息
-  host: 'localhost'
+  host: localhost
   port: 5432
-  database: 'dify'
-  username: 'postgres'
-  password: 'your_password_here'
+  database: dify
+  username: postgres
+  password: your_password_here
   
   # 连接池配置
   pool_size: 10
@@ -23,135 +23,85 @@ database:
   pool_timeout: 30
   
   # SSL配置
-  ssl_mode: 'prefer'  # disable, allow, prefer, require
+  ssl_mode: prefer  # disable, allow, prefer, require
   
   # 表名配置 (如果Dify使用了自定义表名)
   tables:
-    apps: 'apps'
-    workflows: 'workflows'
-    app_environment_variables: 'app_environment_variables'
-    workflow_nodes: 'workflow_nodes'
-    workflow_edges: 'workflow_edges'
+    apps: apps
+    workflows: workflows
+    app_environment_variables: app_environment_variables
+    workflow_nodes: workflow_nodes
+    workflow_edges: workflow_edges
 
 # API连接配置 (当data_source为'api'时使用)
 api:
   # Dify API基础URL - 请修改为您的Dify API地址
-  base_url: 'http://localhost:5001'
+  base_url: https://your-dify-instance.com/
   
-  # API认证方式
+  # API认证方式 - 支持三种认证方式：
   auth:
-    type: 'bearer'  # bearer, basic, api_key
+    # 方式一：Bearer Token认证（推荐）
+    type: bearer  # bearer, basic, api_key
     token: 'your_api_token_here'  # 请填写您的API Token
-    # username: 'admin'  # 用于basic认证时填写
-    # password: 'password'  # 用于basic认证时填写
-    # api_key: 'your_api_key'  # 用于api_key认证时填写
-    # api_key_header: 'X-API-Key'  # API密钥头名称
+    
+    # 方式二：用户名密码认证（基本认证）
+    # type: basic
+    # username: your_username_here  # 您的Dify用户名
+    # password: your_password_here  # 您的Dify密码
+    
+    # 方式三：API Key认证
+    # type: api_key
+    # api_key: your_api_key_here
+    # api_key_header: X-API-Key  # API密钥头名称
   
-  # API端点配置
+  # API端点配置 - 所有API端点的完整配置
   endpoints:
-    apps: '/api/apps/{app_id}'
-    workflows: '/api/apps/{app_id}/workflows/draft'
-    environment_variables: '/api/apps/{app_id}/env-variables'
+    # 应用相关端点
+    apps_list: '/console/api/apps'  # 获取应用列表
+    app_detail: '/console/api/apps/{app_id}'  # 获取单个应用详情
+    app_export: '/console/api/apps/{app_id}/export'  # 应用导出
+    
+    # 工作流相关端点  
+    workflow_draft: '/console/api/apps/{app_id}/workflows/draft'  # 获取工作流草稿
+    workflow_detail: '/console/api/workflows/{workflow_id}'  # 获取工作流详情
+    
+    # 环境变量端点
+    environment_variables: '/console/api/apps/{app_id}/variables'  # 应用环境变量
+    
+  # API查询参数配置
+  params:
+    # 应用列表查询参数
+    apps_list:
+      name: ''  # 应用名称筛选，空表示不筛选
+      is_created_by_me: false  # 是否只显示我创建的应用
+      page: 1  # 默认页码
+      limit: 50  # 默认每页数量
+    
+    # 分页配置
+    pagination:
+      default_page_size: 20  # 前端默认分页大小
+      max_page_size: 100  # 最大分页大小
+      api_page_size: 50  # API调用时的分页大小
   
   # 请求配置
   timeout: 30
   retry_count: 3
   retry_delay: 1
 
-# 手动导入配置 (当data_source为'manual'时使用)
-manual:
-  # 数据存储方式
-  storage_type: 'file'  # file, memory
-  
-  # 文件存储配置
-  file_storage:
-    # 数据文件存储目录
-    data_dir: './data'
-    # 支持的文件格式
-    supported_formats: ['json', 'yaml', 'yml']
-    # 自动备份
-    auto_backup: true
-    backup_dir: './data/backups'
-  
-  # 内存存储配置
-  memory_storage:
-    # 最大存储条目数
-    max_entries: 1000
-    # 数据过期时间(秒)
-    expire_time: 3600
-
 # 导出配置
 export:
   # 默认导出格式
-  default_format: 'yaml'
-  
-  # 输出文件命名规则
-  filename_template: 'workflow-{app_id}-{timestamp}.{format}'
-  
-  # 是否包含敏感信息的默认值
-  include_secrets_default: false
-  
-  # 支持的导出格式
-  supported_formats: ['yaml', 'json']
-  
-  # 压缩配置
-  compression:
-    enabled: false
-    format: 'zip'  # zip, gz, tar
+  default_format: yaml
 
 # 日志配置
 logging:
-  level: 'INFO'  # DEBUG, INFO, WARNING, ERROR
-  file: 'logs/app.log'
-  max_size: '10MB'
+  level: INFO  # DEBUG, INFO, WARNING, ERROR
+  file: logs/app.log
+  max_size: 10MB
   backup_count: 5
   format: '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-
-# 安全配置
-security:
-  # 加密敏感配置
-  encrypt_config: false
-  encryption_key: 'your_encryption_key_here'
-  
-  # 允许的IP地址 (空表示允许所有)
-  allowed_ips: []
-  
-  # API访问限制
-  rate_limit:
-    enabled: true
-    requests_per_minute: 60
 
 # 缓存配置
 cache:
   enabled: true
-  type: 'memory'  # memory, redis, file
-  ttl: 300  # 缓存过期时间(秒)
-  
-  # Redis配置 (当type为'redis'时使用)
-  redis:
-    host: 'localhost'
-    port: 6379
-    db: 0
-    password: null
-  
-  # 文件缓存配置 (当type为'file'时使用)
-  file:
-    cache_dir: './cache'
-    max_size: '100MB'
-
-# 环境变量映射 (可以使用环境变量覆盖配置)
-env_mapping:
-  # 数据库配置
-  'database.host': 'DB_HOST'
-  'database.port': 'DB_PORT'
-  'database.database': 'DB_NAME'
-  'database.username': 'DB_USER'
-  'database.password': 'DB_PASSWORD'
-  
-  # API配置
-  'api.base_url': 'DIFY_API_URL'
-  'api.auth.token': 'DIFY_API_TOKEN'
-  
-  # 其他配置
-  'logging.level': 'LOG_LEVEL'
-  'security.encryption_key': 'ENCRYPTION_KEY' 
+  ttl: 300  # 缓存过期时间(秒) 

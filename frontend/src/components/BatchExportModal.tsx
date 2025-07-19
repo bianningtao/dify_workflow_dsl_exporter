@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { WorkflowSummary } from '../types';
+import AppTypeTag from './AppTypeTag';
 
 interface BatchExportModalProps {
   isOpen: boolean;
@@ -30,7 +31,7 @@ const BatchExportModal: React.FC<BatchExportModalProps> = ({
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div className="bg-white rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
         <div className="flex justify-between items-center mb-6">
-          <h2 className="text-xl font-semibold">批量导出工作流</h2>
+          <h2 className="text-xl font-semibold">批量导出应用</h2>
           <button
             onClick={onClose}
             className="text-gray-400 hover:text-gray-600"
@@ -42,12 +43,15 @@ const BatchExportModal: React.FC<BatchExportModalProps> = ({
         </div>
 
         <div className="mb-6">
-          <h3 className="text-lg font-medium mb-3">选中的工作流 ({selectedWorkflows.length} 个)</h3>
+          <h3 className="text-lg font-medium mb-3">选中的应用 ({selectedWorkflows.length} 个)</h3>
           <div className="max-h-40 overflow-y-auto border border-gray-200 rounded-lg">
             {selectedWorkflows.map((workflow) => (
               <div key={workflow.app_id} className="p-3 border-b last:border-b-0 flex justify-between items-center">
-                <div>
-                  <div className="font-medium">{workflow.name}</div>
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-1">
+                    <div className="font-medium">{workflow.name}</div>
+                    <AppTypeTag appMode={workflow.app_mode || 'workflow'} className="text-xs" />
+                  </div>
                   <div className="text-sm text-gray-600">
                     应用ID: {workflow.app_id} | 节点数: {workflow.node_count}
                   </div>

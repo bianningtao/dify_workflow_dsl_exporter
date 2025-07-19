@@ -12,6 +12,7 @@ export const useBatchWorkflowExport = () => {
     has_next: false,
     has_prev: false
   });
+  const [stats, setStats] = useState<Record<string, number>>({});
   const [selectedWorkflows, setSelectedWorkflows] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -37,6 +38,7 @@ export const useBatchWorkflowExport = () => {
       
       setWorkflows(response.workflows);
       setPagination(response.pagination);
+      setStats(response.stats || {});
       
       // 获取当前页面的工作流ID
       const currentPageAppIds = new Set(response.workflows.map(w => w.app_id));
@@ -323,6 +325,7 @@ export const useBatchWorkflowExport = () => {
   return {
     workflows,
     pagination,
+    stats,
     selectedWorkflows,
     loading,
     exporting,

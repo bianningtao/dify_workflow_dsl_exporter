@@ -6,7 +6,7 @@ from services.workflow_service import WorkflowService
 from services.config_service import config
 from services.database_connector import database_connector
 from services.api_connector import api_connector
-from services.manual_import_service import manual_import_service
+
 import uuid
 
 class AppExportApi(Resource):
@@ -58,8 +58,6 @@ class AppExportApi(Resource):
             app_model = database_connector.get_app_by_id(app_id)
         elif config.is_api_enabled():
             app_model = api_connector.get_app_by_id(app_id)
-        elif config.is_manual_enabled():
-            app_model = manual_import_service.get_app_by_id(app_id)
         else:
             app_model = None
         

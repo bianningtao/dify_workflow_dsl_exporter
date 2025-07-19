@@ -21,10 +21,15 @@ class ConfigService:
     
     def _load_config(self) -> Dict[str, Any]:
         """加载配置文件"""
+        # 首先尝试当前目录
         config_path = Path("config.yaml")
         
+        # 如果当前目录没有，尝试上级目录（项目根目录）
         if not config_path.exists():
-            raise FileNotFoundError(f"配置文件未找到: {config_path}")
+            config_path = Path("../config.yaml")
+        
+        if not config_path.exists():
+            raise FileNotFoundError(f"配置文件未找到，请确保 config.yaml 存在于项目根目录或当前目录")
         
         try:
             with open(config_path, 'r', encoding='utf-8') as f:
@@ -88,7 +93,7 @@ class ConfigService:
         
         data_source = config['data_source']
         
-        if data_source not in ['database', 'api', 'manual']:
+        if data_source not in ['database', 'api']:
             raise ValueError(f"不支持的数据源类型: {data_source}")
         
         # 验证对应的数据源配置
@@ -96,8 +101,6 @@ class ConfigService:
             self._validate_database_config(config.get('database', {}))
         elif data_source == 'api':
             self._validate_api_config(config.get('api', {}))
-        elif data_source == 'manual':
-            self._validate_manual_config(config.get('manual', {}))
     
     def _validate_database_config(self, db_config: Dict[str, Any]) -> None:
         """验证数据库配置"""
@@ -130,14 +133,7 @@ class ConfigService:
         elif auth_type == 'api_key' and 'api_key' not in auth_config:
             raise ValueError("API Key认证缺少api_key配置")
     
-    def _validate_manual_config(self, manual_config: Dict[str, Any]) -> None:
-        """验证手动导入配置"""
-        if 'storage_type' not in manual_config:
-            raise ValueError("缺少手动导入存储类型配置")
         
-        storage_type = manual_config['storage_type']
-        if storage_type not in ['file', 'memory']:
-            raise ValueError(f"不支持的存储类型: {storage_type}")
     
     def get_config(self) -> Dict[str, Any]:
         """获取完整配置"""
@@ -155,9 +151,7 @@ class ConfigService:
         """获取API配置"""
         return self._config.get('api', {})
     
-    def get_manual_config(self) -> Dict[str, Any]:
-        """获取手动导入配置"""
-        return self._config.get('manual', {})
+
     
     def get_export_config(self) -> Dict[str, Any]:
         """获取导出配置"""
@@ -183,9 +177,7 @@ class ConfigService:
         """检查是否启用API连接"""
         return self._config['data_source'] == 'api'
     
-    def is_manual_enabled(self) -> bool:
-        """检查是否启用手动导入"""
-        return self._config['data_source'] == 'manual'
+
     
     def is_cache_enabled(self) -> bool:
         """检查是否启用缓存"""
@@ -222,6 +214,13 @@ class ConfigService:
         
         if auth_config.get('type') == 'bearer':
             headers['Authorization'] = f"Bearer {auth_config.get('token', '')}"
+        elif auth_config.get('type') == 'basic':
+            # 添加基本认证支持
+            import base64
+            username = auth_config.get('username', '')
+            password = auth_config.get('password', '')
+            credentials = base64.b64encode(f"{username}:{password}".encode('utf-8')).decode('utf-8')
+            headers['Authorization'] = f"Basic {credentials}"
         elif auth_config.get('type') == 'api_key':
             header_name = auth_config.get('api_key_header', 'X-API-Key')
             headers[header_name] = auth_config.get('api_key', '')
@@ -230,20 +229,6 @@ class ConfigService:
     
     def create_data_directories(self) -> None:
         """创建必要的数据目录"""
-        if self.is_manual_enabled():
-            manual_config = self.get_manual_config()
-            if manual_config.get('storage_type') == 'file':
-                file_config = manual_config.get('file_storage', {})
-                
-                # 创建数据目录
-                data_dir = Path(file_config.get('data_dir', './data'))
-                data_dir.mkdir(parents=True, exist_ok=True)
-                
-                # 创建备份目录
-                if file_config.get('auto_backup', False):
-                    backup_dir = Path(file_config.get('backup_dir', './data/backups'))
-                    backup_dir.mkdir(parents=True, exist_ok=True)
-        
         # 创建日志目录
         logging_config = self.get_logging_config()
         log_file = logging_config.get('file', 'logs/app.log')

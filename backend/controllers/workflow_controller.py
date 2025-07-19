@@ -34,6 +34,35 @@ class WorkflowDraftApi(Resource):
             ]
         }
 
+class ApiTestApi(Resource):
+    def get(self):
+        """测试API连接"""
+        try:
+            from services.api_connector import api_connector
+            result = api_connector.test_connection()
+            
+            if result["success"]:
+                return result, 200
+            else:
+                return result, 503  # Service Unavailable
+                
+        except Exception as e:
+            return {"success": False, "error": str(e)}, 500
+
+class WorkflowRefreshApi(Resource):
+    def post(self):
+        """刷新工作流列表缓存"""
+        try:
+            workflow_service = WorkflowService()
+            workflow_service.clear_cache()
+            
+            return {
+                "message": "缓存已清除，数据将在下次请求时刷新",
+                "success": True
+            }
+        except Exception as e:
+            return {"error": str(e), "success": False}, 500
+
 class WorkflowListApi(Resource):
     def get(self):
         """获取所有工作流列表"""
@@ -62,6 +91,20 @@ class WorkflowListApi(Resource):
             workflows = result.get("workflows", [])
             total = result.get("total", 0)
             
+            # 获取全量应用类型统计（不分页）
+            all_apps_result = workflow_service.get_workflows_paginated(
+                page=1, 
+                page_size=total if total > 0 else 100, 
+                search=search
+            )
+            all_apps = all_apps_result.get("workflows", [])
+            
+            # 计算应用类型统计
+            type_stats = {}
+            for workflow in all_apps:
+                app_mode = getattr(workflow, 'app_mode', 'workflow')
+                type_stats[app_mode] = type_stats.get(app_mode, 0) + 1
+            
             # 转换为前端需要的格式
             workflow_list = []
             for workflow in workflows:
@@ -77,7 +120,8 @@ class WorkflowListApi(Resource):
                         for env in workflow.environment_variables
                     ),
                     "last_modified": datetime.now().isoformat(),
-                    "description": getattr(workflow, 'app_description', '') or ''
+                    "description": getattr(workflow, 'app_description', '') or '',
+                    "app_mode": getattr(workflow, 'app_mode', 'workflow')  # 添加应用模式字段
                 })
             
             # 计算分页信息
@@ -92,7 +136,8 @@ class WorkflowListApi(Resource):
                     "total_pages": total_pages,
                     "has_next": page < total_pages,
                     "has_prev": page > 1
-                }
+                },
+                "stats": type_stats  # 添加全量应用类型统计
             }
             
         except Exception as e:

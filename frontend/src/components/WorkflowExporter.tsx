@@ -4,6 +4,8 @@ import { useBatchWorkflowExport } from '../hooks/useBatchWorkflowExport';
 import { Workflow, WorkflowSummary } from '../types';
 import ExportConfirmModal from './ExportConfirmModal';
 import BatchExportModal from './BatchExportModal';
+import AppTypeTag from './AppTypeTag';
+import AppTypeStats from './AppTypeStats';
 import Pagination from './Pagination';
 
 const WorkflowExporter: React.FC = () => {
@@ -20,6 +22,7 @@ const WorkflowExporter: React.FC = () => {
   const {
     workflows,
     pagination,
+    stats,
     selectedWorkflows,
     loading: batchLoading,
     exporting: batchExporting,
@@ -186,12 +189,15 @@ const WorkflowExporter: React.FC = () => {
                 <button
                   onClick={() => getAllWorkflows()}
                   disabled={batchLoading}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400"
+                  className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg disabled:bg-gray-100 disabled:text-gray-400"
                 >
-                  {batchLoading ? '刷新中...' : '刷新列表'}
+                  刷新列表
                 </button>
               </div>
             </div>
+
+            {/* 应用类型统计 */}
+            <AppTypeStats stats={stats} total={pagination.total} className="mb-6" />
 
             {/* 搜索结果提示 */}
             {searchKeyword && (
@@ -345,6 +351,7 @@ const WorkflowExporter: React.FC = () => {
                                 敏感变量
                               </span>
                             )}
+                            <AppTypeTag appMode={workflowSummary.app_mode || 'workflow'} />
                           </div>
                         </div>
                       </div>
