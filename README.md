@@ -56,8 +56,8 @@ workflow-dsl-exporter/
 
 ## 🔧 环境要求
 
-- Python 3.8+
-- Node.js 16+
+- Python 3.12+
+- Node.js 22+
 - npm 或 yarn
 - PostgreSQL（如果使用数据库模式）
 
@@ -115,6 +115,7 @@ npm run dev
 - **前端界面**：http://localhost:3000
 - **后端API**：http://localhost:5000
 
+![alt text](images/image.png)
 ## ⚙️ 配置系统
 
 本项目支持三种数据源模式，可以通过配置文件灵活切换：
