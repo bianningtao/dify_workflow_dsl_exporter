@@ -14,14 +14,18 @@ export const useWorkflowExport = () => {
     setError(null);
     
     try {
-      const { data } = await ApiService.exportAppConfig(appId, includeSecret);
+      const response = await ApiService.exportAppConfig(appId, includeSecret);
+      
+      // 使用后端返回的文件名，如果没有则使用默认名称
+      const filename = response.filename || `workflow-${appId}.yml`;
+      const data = response.data;
       
       // 创建下载链接
       const blob = new Blob([data], { type: 'application/yaml' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `workflow-${appId}.yml`;
+      a.download = filename;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);

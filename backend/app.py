@@ -2,7 +2,7 @@ from flask import Flask
 from flask_restful import Api
 from flask_cors import CORS
 from controllers.app_controller import AppExportApi
-from controllers.workflow_controller import WorkflowDraftApi
+from controllers.workflow_controller import WorkflowDraftApi, WorkflowListApi, WorkflowBatchExportApi
 from services.config_service import config
 import os
 import logging
@@ -42,6 +42,8 @@ def create_app():
     # 注册路由
     api.add_resource(AppExportApi, "/api/apps/<string:app_id>/export")
     api.add_resource(WorkflowDraftApi, "/api/apps/<string:app_id>/workflows/draft")
+    api.add_resource(WorkflowListApi, "/api/workflows")
+    api.add_resource(WorkflowBatchExportApi, "/api/workflows/batch-export")
     
     return app
 

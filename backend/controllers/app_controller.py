@@ -20,6 +20,10 @@ class AppExportApi(Resource):
         # 获取或创建应用模型
         app_model = self._get_or_create_app_model(app_id)
         
+        # 获取工作流信息
+        workflow_service = WorkflowService()
+        workflow = workflow_service.get_draft_workflow(app_id)
+        
         try:
             # 导出DSL
             dsl_data = AppDslService.export_dsl(
@@ -27,7 +31,22 @@ class AppExportApi(Resource):
                 include_secret=args["include_secret"]
             )
             
-            return {"data": dsl_data}
+            # 生成文件名 - 使用工作流名称
+            workflow_name = getattr(workflow, 'app_name', None) or app_model.name
+            # 清理文件名，移除特殊字符
+            safe_name = "".join(c for c in workflow_name if c.isalnum() or c in (' ', '-', '_')).strip()
+            safe_name = safe_name.replace(' ', '_')  # 空格替换为下划线
+            if not safe_name:  # 如果名称为空，使用app_id作为fallback
+                safe_name = f"workflow-{app_id[:8]}"
+            
+            filename = f"{safe_name}.yml"
+            
+            return {
+                "data": dsl_data,
+                "filename": filename,
+                "workflow_name": workflow_name,
+                "app_id": app_id
+            }
             
         except Exception as e:
             return {"error": str(e)}, 500

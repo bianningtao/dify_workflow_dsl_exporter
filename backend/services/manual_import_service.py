@@ -207,6 +207,87 @@ class ManualImportService:
             logging.error(f"解析工作流数据失败: {e}")
             return None
     
+    def get_all_workflows(self) -> List[Workflow]:
+        """获取所有工作流"""
+        if not self.config.is_manual_enabled() or not self.data_dir:
+            return []
+        
+        workflows = []
+        
+        try:
+            # 遍历数据目录中的所有文件
+            formats = ['json', 'yaml', 'yml']
+            processed_app_ids = set()
+            
+            for file_path in self.data_dir.iterdir():
+                if not file_path.is_file():
+                    continue
+                
+                # 提取应用ID（文件名去掉扩展名）
+                if file_path.suffix.lstrip('.') in formats:
+                    app_id = file_path.stem
+                    
+                    # 避免重复处理同一个应用（可能有多个格式的文件）
+                    if app_id in processed_app_ids:
+                        continue
+                    
+                    processed_app_ids.add(app_id)
+                    
+                    # 获取工作流
+                    workflow = self.get_workflow_by_app_id(app_id)
+                    if workflow:
+                        workflows.append(workflow)
+            
+            return workflows
+            
+        except Exception as e:
+            logging.error(f"获取所有工作流失败: {e}")
+            return []
+    
+    def get_workflows_paginated(self, page: int = 1, page_size: int = 20, search: str = "") -> dict:
+        """
+        分页获取工作流列表
+        :param page: 页码（从1开始）
+        :param page_size: 每页数量
+        :param search: 搜索关键词
+        :return: 包含工作流列表和总数的字典
+        """
+        if not self.config.is_manual_enabled() or not self.data_dir:
+            return {"workflows": [], "total": 0}
+        
+        try:
+            # 获取所有工作流
+            all_workflows = self.get_all_workflows()
+            
+            # 搜索过滤
+            if search:
+                filtered_workflows = []
+                search_lower = search.lower()
+                for workflow in all_workflows:
+                    # 搜索应用ID和可能的应用名称
+                    app_name = getattr(workflow, 'app_name', f"工作流 {workflow.app_id[:8]}")
+                    if (search_lower in workflow.app_id.lower() or 
+                        search_lower in app_name.lower()):
+                        filtered_workflows.append(workflow)
+                all_workflows = filtered_workflows
+            
+            # 计算总数
+            total = len(all_workflows)
+            
+            # 分页处理
+            start = (page - 1) * page_size
+            end = start + page_size
+            paginated_workflows = all_workflows[start:end]
+            
+            return {
+                "workflows": paginated_workflows,
+                "total": total
+            }
+            
+        except Exception as e:
+            logging.error(f"手动导入分页获取工作流失败: {e}")
+            return {"workflows": [], "total": 0}
+    
     def _load_workflow_data(self, app_id: str) -> Optional[Dict[str, Any]]:
         """加载工作流数据"""
         if not self.data_dir:

@@ -127,3 +127,18 @@ Thumbs.db
 # Build outputs
 build/
 dist/ 
+
+# Configuration files
+config.yaml
+config.yml
+*.config.yaml
+*.config.yml
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Workflow export files
+workflow-*.yml
+workflows-export-*.zip 

@@ -146,6 +146,40 @@ class APIConnector:
             logging.error(f"获取工作流信息失败: {e}")
             return None
     
+    def get_all_workflows(self) -> List[Workflow]:
+        """获取所有工作流"""
+        if not self.config.is_api_enabled():
+            return []
+        
+        api_config = self.config.get_api_config()
+        endpoint = api_config.get('endpoints', {}).get('workflows_list', '/api/workflows')
+        
+        try:
+            response = self._make_request('GET', endpoint)
+            if not response:
+                logging.warning("未找到工作流列表")
+                return []
+            
+            workflows_data = response.get('data', response.get('workflows', []))
+            workflows = []
+            
+            # 为每个工作流获取详细信息
+            for workflow_item in workflows_data:
+                app_id = workflow_item.get('app_id')
+                if not app_id:
+                    continue
+                
+                # 获取完整的工作流信息
+                workflow = self.get_workflow_by_app_id(app_id)
+                if workflow:
+                    workflows.append(workflow)
+            
+            return workflows
+            
+        except Exception as e:
+            logging.error(f"获取所有工作流失败: {e}")
+            return []
+    
     def get_environment_variables_by_app_id(self, app_id: str) -> List[EnvironmentVariable]:
         """根据应用ID获取环境变量"""
         if not self.config.is_api_enabled():
@@ -266,6 +300,50 @@ class APIConnector:
         except Exception as e:
             logging.error(f"获取应用导出数据失败: {e}")
             return None
+    
+    def get_workflows_paginated(self, page: int = 1, page_size: int = 20, search: str = "") -> dict:
+        """
+        分页获取工作流列表
+        :param page: 页码（从1开始）
+        :param page_size: 每页数量
+        :param search: 搜索关键词
+        :return: 包含工作流列表和总数的字典
+        """
+        if not self.config.is_api_enabled():
+            return {"workflows": [], "total": 0}
+        
+        try:
+            # 先获取所有工作流，然后在内存中进行分页（API通常不支持直接分页）
+            all_workflows = self.get_all_workflows()
+            
+            # 搜索过滤
+            if search:
+                filtered_workflows = []
+                search_lower = search.lower()
+                for workflow in all_workflows:
+                    # 搜索应用ID和可能的应用名称
+                    app_name = getattr(workflow, 'app_name', f"工作流 {workflow.app_id[:8]}")
+                    if (search_lower in workflow.app_id.lower() or 
+                        search_lower in app_name.lower()):
+                        filtered_workflows.append(workflow)
+                all_workflows = filtered_workflows
+            
+            # 计算总数
+            total = len(all_workflows)
+            
+            # 分页处理
+            start = (page - 1) * page_size
+            end = start + page_size
+            paginated_workflows = all_workflows[start:end]
+            
+            return {
+                "workflows": paginated_workflows,
+                "total": total
+            }
+            
+        except Exception as e:
+            logging.error(f"API分页获取工作流失败: {e}")
+            return {"workflows": [], "total": 0}
     
     def close(self):
         """关闭API连接器"""

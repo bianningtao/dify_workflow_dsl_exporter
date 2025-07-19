@@ -1,5 +1,5 @@
 from typing import Optional, Dict, Any, List
-from models.app import Workflow, EnvironmentVariable, WorkflowNode, WorkflowEdge
+from models.app import Workflow, EnvironmentVariable, WorkflowNode, WorkflowEdge, App, AppMode
 import uuid
 
 from .config_service import config
@@ -27,6 +27,64 @@ class WorkflowService:
         else:
             # 使用内存存储作为fallback
             return self._workflows.get(app_id)
+    
+    def get_all_workflows(self) -> List[Workflow]:
+        """
+        获取所有工作流列表
+        :return: 工作流列表
+        """
+        workflows = []
+        
+        # 根据配置选择数据源
+        if config.is_database_enabled():
+            workflows = database_connector.get_all_workflows()
+        elif config.is_api_enabled():
+            workflows = api_connector.get_all_workflows()
+        elif config.is_manual_enabled():
+            workflows = manual_import_service.get_all_workflows()
+        else:
+            # 使用内存存储作为fallback
+            workflows = list(self._workflows.values())
+        
+        # 如果没有工作流，创建一些示例工作流用于演示
+        if not workflows:
+            sample_app_ids = ["demo-app-001", "demo-app-002", "demo-app-003"]
+            for app_id in sample_app_ids:
+                workflow = self.create_default_workflow(app_id)
+                workflows.append(workflow)
+        
+        return workflows
+    
+    def get_or_create_app_model(self, app_id: str) -> App:
+        """
+        获取或创建应用模型
+        :param app_id: 应用ID
+        :return: 应用实例
+        """
+        # 根据配置选择数据源
+        app_model = None
+        if config.is_database_enabled():
+            app_model = database_connector.get_app_by_id(app_id)
+        elif config.is_api_enabled():
+            app_model = api_connector.get_app_by_id(app_id)
+        elif config.is_manual_enabled():
+            app_model = manual_import_service.get_app_by_id(app_id)
+        
+        # 如果没有找到应用，创建一个默认的
+        if app_model is None:
+            app_model = App(
+                id=app_id,
+                name=f"工作流应用 {app_id[:8]}",
+                mode=AppMode.WORKFLOW.value,
+                icon="🚀",
+                icon_type="emoji",
+                icon_background="#E4FBCC",
+                description="这是一个示例工作流应用",
+                use_icon_as_answer_icon=False,
+                tenant_id=str(uuid.uuid4())
+            )
+        
+        return app_model
     
     def create_default_workflow(self, app_id: str) -> Workflow:
         """
@@ -164,3 +222,44 @@ class WorkflowService:
             if workflow.id == workflow_id:
                 return workflow
         return None 
+
+    def get_workflows_paginated(self, page: int = 1, page_size: int = 20, search: str = "") -> dict:
+        """
+        分页获取工作流列表
+        :param page: 页码（从1开始）
+        :param page_size: 每页数量
+        :param search: 搜索关键词
+        :return: 包含工作流列表和总数的字典
+        """
+        # 根据配置选择数据源
+        if config.is_database_enabled():
+            return database_connector.get_workflows_paginated(page, page_size, search)
+        elif config.is_api_enabled():
+            return api_connector.get_workflows_paginated(page, page_size, search)
+        elif config.is_manual_enabled():
+            return manual_import_service.get_workflows_paginated(page, page_size, search)
+        else:
+            # 使用内存存储作为fallback
+            workflows = list(self._workflows.values())
+            
+            # 如果没有工作流，创建一些示例工作流
+            if not workflows:
+                sample_app_ids = ["demo-app-001", "demo-app-002", "demo-app-003"]
+                for app_id in sample_app_ids:
+                    workflow = self.create_default_workflow(app_id)
+                    workflows.append(workflow)
+            
+            # 搜索过滤
+            if search:
+                workflows = [w for w in workflows if search.lower() in w.app_id.lower()]
+            
+            # 分页处理
+            total = len(workflows)
+            start = (page - 1) * page_size
+            end = start + page_size
+            paginated_workflows = workflows[start:end]
+            
+            return {
+                "workflows": paginated_workflows,
+                "total": total
+            } 

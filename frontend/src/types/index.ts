@@ -43,4 +43,59 @@ export interface Workflow {
   };
   features: any;
   environment_variables: EnvironmentVariable[];
+}
+
+export interface WorkflowSummary {
+  id: string;
+  app_id: string;
+  app_name: string;
+  version: string;
+  name: string;
+  node_count: number;
+  has_secret_variables: boolean;
+  last_modified: string;
+  description?: string;
+}
+
+export interface PaginationInfo {
+  page: number;
+  page_size: number;
+  total: number;
+  total_pages: number;
+  has_next: boolean;
+  has_prev: boolean;
+}
+
+export interface WorkflowListResponse {
+  workflows: WorkflowSummary[];
+  pagination: PaginationInfo;
+}
+
+export interface WorkflowListParams {
+  page?: number;
+  page_size?: number;
+  search?: string;
+}
+
+export interface BatchExportRequest {
+  app_ids: string[];
+  include_secret: boolean;
+  export_format: 'zip' | 'individual';
+}
+
+export interface BatchExportResult {
+  app_id: string;
+  success: boolean;
+  data?: string;
+  filename?: string;
+  error?: string;
+}
+
+export interface BatchExportResponse {
+  export_format: 'zip' | 'individual';
+  filename?: string;
+  data?: string; // base64 encoded for zip format
+  results: BatchExportResult[];
+  success_count: number;
+  total_count: number;
 } 

@@ -2,6 +2,7 @@ from enum import Enum
 from typing import Optional, List, Dict, Any
 from pydantic import BaseModel
 import uuid
+from datetime import datetime
 
 class AppMode(Enum):
     ADVANCED_CHAT = "advanced-chat"
@@ -52,12 +53,33 @@ class Workflow(BaseModel):
     features: Dict[str, Any] = {}
     environment_variables: List[EnvironmentVariable] = []
     
+    # 应用相关信息（可选字段）
+    app_name: Optional[str] = None
+    app_description: Optional[str] = None
+    app_mode: Optional[str] = None
+    
     def to_dict(self, include_secret: bool = False) -> Dict[str, Any]:
         workflow_dict = {
             "version": self.version,
             "graph": self.graph,
             "features": self.features,
             "environment_variables": []
+        }
+        
+        # 添加工作流信息
+        if self.app_name:
+            workflow_dict["workflow_name"] = self.app_name
+        if self.app_description:
+            workflow_dict["workflow_description"] = self.app_description
+        if self.app_mode:
+            workflow_dict["workflow_mode"] = self.app_mode
+        
+        # 添加元数据信息
+        workflow_dict["workflow_metadata"] = {
+            "app_id": self.app_id,
+            "workflow_id": self.id,
+            "version": self.version,
+            "export_time": datetime.now().isoformat()
         }
         
         # 过滤环境变量

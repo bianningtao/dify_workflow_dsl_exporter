@@ -114,88 +114,146 @@ class DatabaseConnector:
             return None
     
     def get_workflow_by_app_id(self, app_id: str) -> Optional[Workflow]:
-        """根据应用ID获取工作流信息"""
+        """根据应用ID获取工作流"""
         if not self.config.is_database_enabled():
             return None
-        
-        db_config = self.config.get_database_config()
-        workflow_table = db_config.get('tables', {}).get('workflows', 'workflows')
-        
-        query = f"""
-            SELECT id, app_id, version, graph, features, 
-                   created_at, updated_at
-            FROM {workflow_table}
-            WHERE app_id = %s
-            ORDER BY updated_at DESC
-            LIMIT 1
-        """
-        
+            
         try:
-            results = self.execute_query(query, (app_id,))
+            # 查询工作流基本信息（包括环境变量）
+            workflow_query = """
+                SELECT wf.id, wf.app_id, wf.version, wf.graph, wf.features, wf.environment_variables
+                FROM workflows wf 
+                WHERE wf.app_id = %s 
+                ORDER BY wf.created_at DESC 
+                LIMIT 1
+            """
+            
+            results = self.execute_query(workflow_query, (app_id,))
             if not results:
-                logging.warning(f"未找到应用ID为 {app_id} 的工作流")
                 return None
             
             workflow_data = results[0]
             
             # 解析JSON字段
-            graph = workflow_data.get('graph', {})
-            if isinstance(graph, str):
-                graph = json.loads(graph)
+            graph = self._parse_json_field(workflow_data['graph'])
+            features = self._parse_json_field(workflow_data['features']) 
+            environment_variables_data = self._parse_json_field(workflow_data['environment_variables']) or []
             
-            features = workflow_data.get('features', {})
-            if isinstance(features, str):
-                features = json.loads(features)
+            # 解析环境变量
+            env_vars = []
+            for env_var_data in environment_variables_data:
+                if isinstance(env_var_data, dict):
+                    env_vars.append(EnvironmentVariable(
+                        name=env_var_data.get('name', ''),
+                        value=env_var_data.get('value', ''),
+                        value_type=env_var_data.get('value_type', 'string')
+                    ))
             
-            # 获取环境变量
-            environment_variables = self.get_environment_variables_by_app_id(app_id)
-            
-            return Workflow(
+            # 构造工作流对象
+            workflow = Workflow(
                 id=workflow_data['id'],
                 app_id=workflow_data['app_id'],
-                version=workflow_data.get('version', '1.0'),
+                version=workflow_data['version'],
                 graph=graph,
                 features=features,
-                environment_variables=environment_variables
+                environment_variables=env_vars
             )
+            
+            return workflow
+            
         except Exception as e:
-            logging.error(f"获取工作流信息失败: {e}")
+            logging.error(f"获取工作流失败: {e}")
             return None
+    
+    def get_all_workflows(self) -> List[Workflow]:
+        """获取所有工作流"""
+        if not self.config.is_database_enabled():
+            return []
+            
+        try:
+            # 查询所有工作流（包括环境变量）
+            workflow_query = """
+                SELECT wf.id, wf.app_id, wf.version, wf.graph, wf.features, wf.environment_variables
+                FROM workflows wf 
+                ORDER BY wf.created_at DESC
+                LIMIT 50
+            """
+            
+            results = self.execute_query(workflow_query)
+            workflows = []
+            
+            for workflow_data in results:
+                try:
+                    # 解析JSON字段
+                    graph = self._parse_json_field(workflow_data['graph'])
+                    features = self._parse_json_field(workflow_data['features'])
+                    environment_variables_data = self._parse_json_field(workflow_data['environment_variables']) or []
+                    
+                    # 解析环境变量
+                    env_vars = []
+                    for env_var_data in environment_variables_data:
+                        if isinstance(env_var_data, dict):
+                            env_vars.append(EnvironmentVariable(
+                                name=env_var_data.get('name', ''),
+                                value=env_var_data.get('value', ''),
+                                value_type=env_var_data.get('value_type', 'string')
+                            ))
+                    
+                    # 构造工作流对象
+                    workflow = Workflow(
+                        id=workflow_data['id'],
+                        app_id=workflow_data['app_id'],
+                        version=workflow_data['version'],
+                        graph=graph,
+                        features=features,
+                        environment_variables=env_vars
+                    )
+                    
+                    workflows.append(workflow)
+                    
+                except Exception as e:
+                    logging.error(f"解析工作流数据失败 (ID: {workflow_data.get('id', 'unknown')}): {e}")
+                    continue
+            
+            return workflows
+            
+        except Exception as e:
+            logging.error(f"获取所有工作流失败: {e}")
+            return []
     
     def get_environment_variables_by_app_id(self, app_id: str) -> List[EnvironmentVariable]:
         """根据应用ID获取环境变量"""
         if not self.config.is_database_enabled():
             return []
         
-        db_config = self.config.get_database_config()
-        env_table = db_config.get('tables', {}).get('app_environment_variables', 'app_environment_variables')
-        
-        query = f"""
-            SELECT name, value, value_type, is_secret
-            FROM {env_table}
+        query = """
+            SELECT environment_variables
+            FROM workflows
             WHERE app_id = %s
-            ORDER BY name
+            ORDER BY created_at DESC
+            LIMIT 1
         """
         
         try:
             results = self.execute_query(query, (app_id,))
+            if not results:
+                return []
+            
+            environment_variables_data = self._parse_json_field(results[0]['environment_variables']) or []
             environment_variables = []
             
-            for row in results:
-                # 确定变量类型
-                value_type = row.get('value_type', 'string')
-                if row.get('is_secret', False):
-                    value_type = 'secret'
-                
-                environment_variables.append(
-                    EnvironmentVariable(
-                        name=row['name'],
-                        value=row['value'],
-                        value_type=value_type
+            for env_var_data in environment_variables_data:
+                if isinstance(env_var_data, dict):
+                    environment_variables.append(
+                        EnvironmentVariable(
+                            name=env_var_data.get('name', ''),
+                            value=env_var_data.get('value', ''),
+                            value_type=env_var_data.get('value_type', 'string')
+                        )
                     )
-                )
             
             return environment_variables
+            
         except Exception as e:
             logging.error(f"获取环境变量失败: {e}")
             return []
@@ -300,6 +358,117 @@ class DatabaseConnector:
         if self.pool:
             self.pool.closeall()
             logging.info("数据库连接池已关闭")
+
+    def _parse_json_field(self, json_field) -> dict:
+        """解析JSON字段"""
+        if json_field is None:
+            return {}
+        if isinstance(json_field, dict):
+            return json_field
+        if isinstance(json_field, str):
+            try:
+                return json.loads(json_field)
+            except json.JSONDecodeError as e:
+                logging.warning(f"JSON解析失败: {e}")
+                return {}
+        return {}
+
+    def get_workflows_paginated(self, page: int = 1, page_size: int = 20, search: str = "") -> dict:
+        """
+        分页获取工作流列表
+        :param page: 页码（从1开始）
+        :param page_size: 每页数量
+        :param search: 搜索关键词
+        :return: 包含工作流列表和总数的字典
+        """
+        if not self.config.is_database_enabled():
+            return {"workflows": [], "total": 0}
+            
+        try:
+            # 计算偏移量
+            offset = (page - 1) * page_size
+            
+            # 构建搜索条件
+            search_condition = ""
+            search_params = []
+            if search:
+                search_condition = "WHERE (a.name ILIKE %s OR wf.app_id::text ILIKE %s)"
+                search_params = [f"%{search}%", f"%{search}%"]
+            
+            # 获取总数的查询 - 按app_id去重
+            count_query = f"""
+                SELECT COUNT(DISTINCT wf.app_id)
+                FROM workflows wf
+                LEFT JOIN apps a ON wf.app_id = a.id
+                {search_condition}
+            """
+            
+            # 获取分页数据的查询 - 每个app_id只取最新的工作流
+            data_query = f"""
+                SELECT DISTINCT ON (wf.app_id)
+                    wf.id, wf.app_id, wf.version, wf.graph, wf.features, 
+                    wf.environment_variables, wf.created_at,
+                    a.name as app_name, a.description as app_description, a.mode as app_mode
+                FROM workflows wf
+                LEFT JOIN apps a ON wf.app_id = a.id
+                {search_condition}
+                ORDER BY wf.app_id, wf.created_at DESC
+                LIMIT %s OFFSET %s
+            """
+            
+            # 执行总数查询
+            count_results = self.execute_query(count_query, search_params)
+            total = count_results[0]['count'] if count_results else 0
+            
+            # 执行分页查询
+            data_params = search_params + [page_size, offset]
+            data_results = self.execute_query(data_query, data_params)
+            
+            workflows = []
+            for workflow_data in data_results:
+                try:
+                    # 解析JSON字段
+                    graph = self._parse_json_field(workflow_data['graph'])
+                    features = self._parse_json_field(workflow_data['features'])
+                    environment_variables_data = self._parse_json_field(workflow_data['environment_variables']) or []
+                    
+                    # 解析环境变量
+                    env_vars = []
+                    for env_var_data in environment_variables_data:
+                        if isinstance(env_var_data, dict):
+                            env_vars.append(EnvironmentVariable(
+                                name=env_var_data.get('name', ''),
+                                value=env_var_data.get('value', ''),
+                                value_type=env_var_data.get('value_type', 'string')
+                            ))
+                    
+                    # 构造工作流对象
+                    workflow = Workflow(
+                        id=workflow_data['id'],
+                        app_id=workflow_data['app_id'],
+                        version=workflow_data['version'],
+                        graph=graph,
+                        features=features,
+                        environment_variables=env_vars,
+                        app_name=workflow_data.get('app_name') or f"工作流 {workflow_data['app_id'][:8]}",
+                        app_description=workflow_data.get('app_description') or '',
+                        app_mode=workflow_data.get('app_mode') or 'workflow'
+                    )
+                    
+                    workflows.append(workflow)
+                    
+                except Exception as e:
+                    logging.error(f"解析工作流数据失败 (ID: {workflow_data.get('id', 'unknown')}): {e}")
+                    continue
+            
+            return {
+                "workflows": workflows,
+                "total": total
+            }
+            
+        except Exception as e:
+            logging.error(f"分页获取工作流失败: {e}")
+            return {"workflows": [], "total": 0}
 
 
 # 全局数据库连接器实例
