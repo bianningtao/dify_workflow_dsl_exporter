@@ -1,6 +1,7 @@
 import { Workflow, WorkflowListResponse, WorkflowListParams, BatchExportRequest, BatchExportResponse } from '../types';
 
-const API_BASE_URL = 'http://localhost:5000/api';
+// 使用相对路径，在Docker中通过Nginx代理，在开发中直接访问后端
+const API_BASE_URL = '/api';
 
 export class ApiService {
   static async exportAppConfig(appId: string, includeSecret: boolean = false): Promise<{ data: string }> {

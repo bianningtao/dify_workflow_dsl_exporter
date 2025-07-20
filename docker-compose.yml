@@ -1,0 +1,29 @@
+version: '3.8'
+
+services:
+  workflow-dsl-exporter:
+    image: workflow-dsl-exporter:v0.1.0
+    container_name: workflow-dsl-exporter
+    ports:
+      - "80:80"
+      - "5000:5000"
+    volumes:
+      - ./logs:/app/logs
+      - ./data:/app/data
+      - ./config.example.yaml:/app/backend/config.yaml:ro
+    environment:
+      - FLASK_ENV=production
+      - PYTHONPATH=/app/backend
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - workflow-network
+
+networks:
+  workflow-network:
+    driver: bridge 
