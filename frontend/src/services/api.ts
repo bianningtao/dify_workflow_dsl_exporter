@@ -77,4 +77,19 @@ export class ApiService {
     
     return response.json();
   }
+  
+  static async refreshWorkflows(): Promise<{ success: boolean; message: string }> {
+    const response = await fetch(`${API_BASE_URL}/workflows/refresh`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Refresh failed: ${response.statusText}`);
+    }
+    
+    return response.json();
+  }
 } 

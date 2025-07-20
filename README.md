@@ -115,7 +115,7 @@ npm run dev
 - **前端界面**：http://localhost:3000
 - **后端API**：http://localhost:5000
 
-![alt text](images/image.png)
+![alt text](<images/image copy.png>)
 ## ⚙️ 配置系统
 
 本项目支持两种数据源模式，可以通过配置文件灵活切换：

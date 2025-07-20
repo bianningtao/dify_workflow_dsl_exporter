@@ -49,7 +49,7 @@ const BatchExportModal: React.FC<BatchExportModalProps> = ({
               <div key={workflow.app_id} className="p-3 border-b last:border-b-0 flex justify-between items-center">
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-1">
-                    <div className="font-medium">{workflow.name}</div>
+                  <div className="font-medium">{workflow.name}</div>
                     <AppTypeTag appMode={workflow.app_mode || 'workflow'} className="text-xs" />
                   </div>
                   <div className="text-sm text-gray-600">

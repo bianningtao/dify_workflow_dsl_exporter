@@ -104,4 +104,4 @@ logging:
 # 缓存配置
 cache:
   enabled: true
-  ttl: 300  # 缓存过期时间(秒) 
+  ttl: 300  # 缓存过期时间(秒)

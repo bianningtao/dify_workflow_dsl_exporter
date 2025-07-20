@@ -61,6 +61,35 @@ export const useBatchWorkflowExport = () => {
     }
   }, [pagination.page, pagination.page_size, searchKeyword]);
 
+  const refreshWorkflows = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      // 先调用刷新接口清除缓存
+      await ApiService.refreshWorkflows();
+      
+      // 然后重新获取数据
+      const response = await ApiService.getAllWorkflows({
+        page: 1, // 刷新后回到第一页
+        page_size: pagination.page_size,
+        search: searchKeyword,
+      });
+      
+      setWorkflows(response.workflows);
+      setPagination(response.pagination);
+      setStats(response.stats || {});
+      
+      // 清除所有选择
+      setSelectedWorkflows(new Set());
+      
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [pagination.page_size, searchKeyword]);
+
   const goToPage = useCallback(async (page: number) => {
     if (page >= 1 && page <= pagination.total_pages) {
       try {
@@ -333,6 +362,7 @@ export const useBatchWorkflowExport = () => {
     searchKeyword,
     exportProgress,
     getAllWorkflows,
+    refreshWorkflows,
     goToPage,
     changePageSize,
     handleSearch,

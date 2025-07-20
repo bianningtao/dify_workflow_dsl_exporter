@@ -30,6 +30,7 @@ const WorkflowExporter: React.FC = () => {
     searchKeyword,
     exportProgress,
     getAllWorkflows,
+    refreshWorkflows,
     goToPage,
     changePageSize,
     handleSearch,
@@ -187,7 +188,7 @@ const WorkflowExporter: React.FC = () => {
                 </form>
                 
                 <button
-                  onClick={() => getAllWorkflows()}
+                  onClick={() => refreshWorkflows()}
                   disabled={batchLoading}
                   className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg disabled:bg-gray-100 disabled:text-gray-400"
                 >

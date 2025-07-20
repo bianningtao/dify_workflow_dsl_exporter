@@ -18,6 +18,8 @@ class APIConnector:
         self.session = self._create_session()
         self.base_url = None
         self.headers = {}
+        # 添加超时配置
+        self.timeout = 30  # 默认30秒超时
         # 添加简单缓存
         self._workflow_apps_cache = None
         self._cache_timestamp = None
@@ -303,15 +305,15 @@ class APIConnector:
                 return
         else:
             # 使用配置的认证头
-        self.headers = self.config.get_api_headers()
+            self.headers = self.config.get_api_headers()
         
-        # 设置会话头部
-        self.session.headers.update(self.headers)
-        
-        # 设置超时
-        self.timeout = api_config.get('timeout', 30)
-        
-        logging.info(f"API连接器初始化成功，基础URL: {self.base_url}")
+            # 设置会话头部
+            self.session.headers.update(self.headers)
+            
+            # 设置超时
+            self.timeout = api_config.get('timeout', 30)
+            
+            logging.info(f"API连接器初始化成功，基础URL: {self.base_url}")
     
     def _make_request(self, method: str, endpoint: str, **kwargs) -> Optional[Dict[str, Any]]:
         """发送HTTP请求"""
@@ -444,16 +446,16 @@ class APIConnector:
                 
                 try:
                     workflow = self.get_workflow_by_app_id(app_info['id'])
-                if workflow:
+                    if workflow:
                         # 确保工作流包含应用名称信息
                         workflow.app_name = app_info['name']
                         workflow.app_description = app_info['description']
                         workflow.app_mode = app_info['mode']
-                    workflows.append(workflow)
+                        workflows.append(workflow)
                         if i <= 5:  # 只显示前5个的成功信息
                             logging.info(f"成功获取工作流: {app_info['name']}")
-                    else:
-                        logging.warning(f"无法获取工作流详情: {app_info['name']} ({app_info['id']})")
+                        else:
+                            logging.warning(f"无法获取工作流详情: {app_info['name']} ({app_info['id']})")
                 except Exception as e:
                     logging.error(f"获取工作流时出错: {app_info['name']} ({app_info['id']}) - {e}")
             
@@ -471,7 +473,7 @@ class APIConnector:
         
         # 暂时禁用环境变量获取以避免404错误
         logging.info(f"跳过环境变量获取 (应用ID: {app_id})")
-            return []
+        return []
     
     def test_connection(self) -> dict:
         """测试API连接是否正常"""
