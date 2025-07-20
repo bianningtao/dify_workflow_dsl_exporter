@@ -63,7 +63,22 @@ workflow-dsl-exporter/
 
 ## 🚀 快速开始
 
-### 方法一：使用启动脚本（推荐）
+### 方法一：使用Docker Compose（推荐）
+
+```bash
+# 1. 克隆项目
+git clone <repository-url>
+cd workflow-dsl-exporter
+
+# 2. 配置系统
+cp config.example.yaml config.yaml
+# 编辑 config.yaml 配置文件（见下方配置说明）
+
+# 3. 使用Docker Compose启动
+docker-compose up -d
+```
+
+### 方法二：使用启动脚本
 
 ```bash
 # 1. 克隆项目
@@ -79,7 +94,7 @@ chmod +x start.sh
 ./start.sh
 ```
 
-### 方法二：手动启动
+### 方法三：手动启动
 
 #### 启动后端服务
 
@@ -114,6 +129,8 @@ npm run dev
 
 - **前端界面**：http://localhost:3000
 - **后端API**：http://localhost:5000
+
+> 💡 **Docker Compose用户**：如果使用Docker Compose启动，应用将在 http://localhost:8080 访问
 
 ![alt text](<images/image copy.png>)
 ## ⚙️ 配置系统
