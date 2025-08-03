@@ -1,18 +1,35 @@
-# 工作流 DSL 导出器
+# Dify 工作流 DSL 导入导出工具
 
-这是一个从 Dify 系统批量导出工作流 DSL 配置的独立工具。该项目提供了完整的前后端解决方案，支持单个和批量导出工作流配置为 DSL 格式，包含现代化的 Web 界面和灵活的数据源配置。
+这是一个功能完整的 Dify 工作流 DSL 导入导出工具。该项目提供了完整的前后端解决方案，支持工作流配置的双向操作：既可以从 Dify 系统批量导出工作流 DSL 配置，也可以将 DSL 文件导入到指定的 Dify 实例中，包含现代化的 Web 界面和灵活的数据源配置。
 
 ## ✨ 功能特性
 
+### 📤 导出功能
 - 🚀 **批量导出**: 支持选择多个工作流进行批量导出
 - 📦 **ZIP打包**: 自动将多个DSL文件打包成ZIP格式下载
-- 🔒 **敏感信息处理**: 智能检测并选择是否包含敏感环境变量
+- 📊 **进度显示**: 批量导出时显示实时进度和状态
+- 📝 **单个导出**: 支持输入应用ID进行单个工作流导出
+
+### 📥 导入功能
+- 🎯 **单个导入**: 支持上传单个DSL文件到指定Dify实例
+- 📦 **批量导入**: 支持批量选择多个DSL文件进行导入
+- 🎯 **目标实例选择**: 支持配置和选择多个目标Dify实例
+- ✅ **导入确认**: 智能解析DSL内容，提供导入预览和确认功能
+- 🔄 **实时状态**: 显示导入进度和实时状态更新
+
+### 🎨 界面与体验
 - 🎨 **现代化界面**: 提供直观美观的 Web 界面
+- 🔀 **双模式切换**: 支持导出/导入模式快速切换
+- 📋 **两级菜单**: 主模式（导入/导出）+ 子模式（单个/批量）
 - ⚡ **实时预览**: 展示工作流结构、节点数量和环境变量
+- 🎉 **优雅反馈**: 使用精美的成功弹窗替代简单提示
+
+### 🔧 系统功能
+- 🔒 **敏感信息处理**: 智能检测并选择是否包含敏感环境变量
 - 🔄 **多数据源支持**: 支持数据库连接、API调用、手动导入三种数据源
 - ⚙️ **灵活配置**: 通过配置文件和环境变量灵活配置系统行为
-- 📊 **进度显示**: 批量导出时显示实时进度和状态
-- 🛡️ **错误容错**: 即使部分工作流导出失败，其他工作流仍可正常导出
+- 🛡️ **错误容错**: 即使部分工作流操作失败，其他操作仍可正常执行
+- 🔗 **多实例支持**: 支持配置多个Dify实例，实现跨实例工作流迁移
 
 ## 🏗️ 项目结构
 
@@ -26,17 +43,22 @@ workflow-dsl-exporter/
 │   ├── services/               # 业务逻辑服务
 │   │   ├── app_dsl_service.py         # DSL 导出服务
 │   │   ├── workflow_service.py        # 工作流服务
+│   │   ├── workflow_import_service.py # 工作流导入服务
 │   │   ├── config_service.py          # 配置服务
 │   │   ├── database_connector.py      # 数据库连接器
-│   │   ├── api_connector.py           # API连接器
-
+│   │   └── api_connector.py           # API连接器
 │   └── controllers/            # API 控制器
-│       ├── app_controller.py          # 应用控制器
-│       └── workflow_controller.py     # 工作流控制器
+│       ├── app_controller.py             # 应用控制器
+│       ├── workflow_controller.py        # 工作流控制器
+│       └── workflow_import_controller.py # 工作流导入控制器
 ├── frontend/                   # 前端应用
 │   ├── src/
 │   │   ├── components/         # React 组件
-│   │   │   ├── WorkflowExporter.tsx      # 主导出组件
+│   │   │   ├── WorkflowExporter.tsx      # 主导出导入组件
+│   │   │   ├── WorkflowImporter.tsx      # 工作流导入组件
+│   │   │   ├── BatchImportModal.tsx      # 批量导入模态框
+│   │   │   ├── TargetInstanceSelector.tsx # 目标实例选择器
+│   │   │   ├── SuccessModal.tsx          # 成功提示弹窗
 │   │   │   ├── BatchExportModal.tsx      # 批量导出模态框
 │   │   │   └── ExportConfirmModal.tsx    # 导出确认模态框
 │   │   ├── hooks/              # 自定义 Hooks
@@ -198,23 +220,62 @@ api:
     type: 'bearer'
     token: 'your_api_token_here'
   
+  # 或者基本认证
+  # auth:
+  #   type: 'basic'
+  #   username: 'your_username'
+  #   password: 'your_password'
+  
   # 或者API Key认证
   # auth:
   #   type: 'api_key'
   #   api_key: 'your_api_key'
   #   api_key_header: 'X-API-Key'
   
-  # API端点配置
+  # API端点配置 - 完整的端点列表
   endpoints:
-    apps: '/api/apps/{app_id}'
-    workflows: '/api/apps/{app_id}/workflows/draft'
-    environment_variables: '/api/apps/{app_id}/env-variables'
-    workflows_list: '/api/workflows'  # 工作流列表端点
+    # 应用相关端点
+    apps_list: '/console/api/apps'
+    app_detail: '/console/api/apps/{app_id}'
+    app_export: '/console/api/apps/{app_id}/export'
+    app_import: '/console/api/apps/imports'
+    
+    # 工作流相关端点
+    workflow_draft: '/console/api/apps/{app_id}/workflows/draft'
+    workflow_detail: '/console/api/workflows/{workflow_id}'
+    
+    # 环境变量端点
+    environment_variables: '/console/api/apps/{app_id}/variables'
+    
+    # 导入相关端点
+    import_status: '/console/api/apps/imports/{import_id}'
+    import_confirm: '/console/api/apps/imports/{import_id}/confirm'
+    check_dependencies: '/console/api/apps/imports/{import_id}/check-dependencies'
   
   # 请求配置
   timeout: 30
   retry_count: 3
   retry_delay: 1
+
+# 目标Dify实例配置 (用于工作流导入)
+target_instances:
+  # 默认实例（本地或当前连接的Dify实例）
+  - id: default
+    name: 本地Dify实例
+    url: https://your-dify-instance.com/
+    auth:
+      type: bearer  # bearer, basic, api_key
+      token: 'your_console_api_token_here'
+    is_default: true
+    
+  # 可以配置多个目标实例
+  - id: production
+    name: 生产环境Dify
+    url: https://prod-dify.company.com/
+    auth:
+      type: bearer
+      token: 'prod_console_api_token_here'
+    is_default: false
 ```
 
 
@@ -241,7 +302,13 @@ export LOG_LEVEL=DEBUG
 
 ## 📋 使用说明
 
-### 🎯 批量导出模式（默认）
+系统提供两级菜单导航：
+- **主模式选择**：工作流导出 / 工作流导入
+- **子模式选择**：批量 / 单个
+
+### 📤 工作流导出功能
+
+#### 🎯 批量导出模式
 
 1. **查看工作流列表**
    - 启动后自动加载所有工作流
@@ -268,10 +335,10 @@ export LOG_LEVEL=DEBUG
    - ZIP格式：自动下载压缩包
    - 单独文件：逐个下载每个DSL文件
 
-### 📝 单个导出模式
+#### 📝 单个导出模式
 
-1. **切换模式**
-   - 选择"单个导出模式"单选按钮
+1. **切换到单个模式**
+   - 在导出页面选择"单个"子模式
 
 2. **输入应用ID**
    - 在输入框中输入要导出的应用ID
@@ -286,6 +353,65 @@ export LOG_LEVEL=DEBUG
    - 点击"导出DSL"按钮
    - 如果存在敏感环境变量，会弹出确认框
    - 确认后自动下载DSL文件
+
+### 📥 工作流导入功能
+
+#### 📦 批量导入模式
+
+1. **选择目标实例**
+   - 从下拉菜单中选择要导入的目标Dify实例
+   - 系统会显示实例的连接状态
+   - 可以手动测试连接
+
+2. **选择DSL文件**
+   - 点击"选择文件"按钮或拖拽文件到上传区域
+   - 支持选择多个YAML格式的DSL文件
+   - 系统会验证文件格式和内容
+
+3. **文件预览**
+   - 查看已选择的文件列表
+   - 显示每个文件的基本信息
+   - 可以移除不需要的文件
+
+4. **开始导入**
+   - 点击"开始批量导入"按钮
+   - 系统显示导入进度
+   - 可以看到每个文件的导入状态
+
+5. **导入确认**
+   - 对于需要确认的导入，系统会弹出确认对话框
+   - 显示导入预览信息
+   - 确认后完成导入
+
+6. **查看结果**
+   - 导入完成后显示优雅的成功弹窗
+   - 包含导入统计信息（成功/失败数量）
+   - 可以复制应用ID到剪贴板
+
+#### 🎯 单个导入模式
+
+1. **选择目标实例**
+   - 从下拉菜单中选择要导入的目标Dify实例
+   - 确认实例连接状态正常
+
+2. **上传DSL文件**
+   - 点击上传区域或拖拽单个YAML文件
+   - 系统自动验证文件格式
+
+3. **文件解析**
+   - 查看DSL文件的解析结果
+   - 显示应用名称、工作流类型等信息
+   - 检查是否有依赖冲突
+
+4. **确认导入**
+   - 点击"导入工作流"按钮
+   - 系统解析DSL并显示预览
+   - 确认导入信息无误后点击确认
+
+5. **完成导入**
+   - 导入成功后显示优雅的成功弹窗
+   - 显示新创建应用的ID
+   - 可以选择刷新页面或继续操作
 
 ## 🔌 API 接口
 
@@ -347,6 +473,136 @@ Content-Type: application/json
   "results": [...],
   "success_count": 2,
   "total_count": 2
+}
+```
+
+### 获取目标实例列表
+
+```http
+GET /api/import/target-instances
+```
+
+响应：
+```json
+{
+  "instances": [
+    {
+      "id": "default",
+      "name": "本地Dify实例",
+      "url": "https://dify.asyncai.top/",
+      "is_default": true,
+      "status": "connected"
+    }
+  ]
+}
+```
+
+### 测试实例连接
+
+```http
+POST /api/import/test-connection
+Content-Type: application/json
+
+{
+  "instance_id": "default"
+}
+```
+
+响应：
+```json
+{
+  "success": true,
+  "message": "连接成功",
+  "instance_info": {
+    "version": "0.6.0",
+    "name": "Dify Instance"
+  }
+}
+```
+
+### 单个工作流导入
+
+```http
+POST /api/import/single
+Content-Type: multipart/form-data
+
+{
+  "file": "workflow.yaml",
+  "target_instance_id": "default"
+}
+```
+
+响应：
+```json
+{
+  "success": true,
+  "import_id": "import-uuid",
+  "message": "导入请求已提交",
+  "requires_confirmation": true,
+  "app_info": {
+    "name": "工作流名称",
+    "mode": "workflow"
+  }
+}
+```
+
+### 批量工作流导入
+
+```http
+POST /api/import/batch
+Content-Type: multipart/form-data
+
+{
+  "files": ["workflow1.yaml", "workflow2.yaml"],
+  "target_instance_id": "default"
+}
+```
+
+响应：
+```json
+{
+  "success": true,
+  "results": [
+    {
+      "filename": "workflow1.yaml",
+      "status": "success",
+      "import_id": "import-uuid-1",
+      "app_id": "app-uuid-1"
+    },
+    {
+      "filename": "workflow2.yaml", 
+      "status": "requires_confirmation",
+      "import_id": "import-uuid-2",
+      "message": "需要确认导入"
+    }
+  ],
+  "success_count": 1,
+  "total_count": 2
+}
+```
+
+### 确认导入
+
+```http
+POST /api/import/confirm
+Content-Type: application/json
+
+{
+  "import_id": "import-uuid",
+  "target_instance_id": "default"
+}
+```
+
+响应：
+```json
+{
+  "success": true,
+  "app_id": "app-uuid",
+  "message": "导入成功",
+  "app_info": {
+    "name": "工作流名称",
+    "id": "app-uuid"
+  }
 }
 ```
 
@@ -558,6 +814,16 @@ logging:
 
 ## 📈 更新日志
 
+### v3.0.0 (2025-08-03)
+- 🎯 **新增工作流导入功能**：支持单个和批量工作流导入
+- 🔗 **多实例支持**：可配置多个目标Dify实例进行跨实例迁移
+- 🎨 **两级菜单设计**：主模式（导入/导出）+ 子模式（单个/批量）
+- 🎉 **优雅用户体验**：使用精美的成功弹窗替代简单提示
+- ⚙️ **灵活API配置**：支持可配置的API端点和认证方式
+- 📋 **导入确认机制**：智能解析DSL并提供导入预览
+- 🔄 **实时状态更新**：显示导入进度和连接状态
+- 📊 **统计信息展示**：导入完成后显示详细的成功/失败统计
+
 ### v2.0.0 (2025-07-19)
 - ✨ 新增批量导出功能
 - 📦 支持ZIP文件打包下载
@@ -593,4 +859,4 @@ MIT License
 
 ---
 
-**Happy Exporting! 🚀** 
+**Happy Importing & Exporting! 🚀📥📤** 
