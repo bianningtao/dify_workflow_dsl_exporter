@@ -152,9 +152,11 @@ npm run dev
 - **前端界面**：http://localhost:3000
 - **后端API**：http://localhost:5000
 
-> 💡 **Docker Compose用户**：如果使用Docker Compose启动，应用将在 http://localhost:8080 访问
+- **Docker Compose用户**：如果使用Docker Compose启动，应用将在 http://localhost:8080 访问
 
-![alt text](<images/image copy.png>)
+![alt text](<images/image copy 2.png>)
+![alt text](<images/image copy 3.png>)
+
 ## ⚙️ 配置系统
 
 本项目支持两种数据源模式，可以通过配置文件灵活切换：
