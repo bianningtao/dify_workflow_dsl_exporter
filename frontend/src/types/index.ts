@@ -100,4 +100,88 @@ export interface BatchExportResponse {
   results: BatchExportResult[];
   success_count: number;
   total_count: number;
+}
+
+// 工作流导入相关类型定义
+export interface DifyInstance {
+  id: string;
+  name: string;
+  url: string;
+  auth_type: 'bearer' | 'basic' | 'api_key';
+  auth_config: {
+    token?: string;
+    username?: string;
+    password?: string;
+    api_key?: string;
+    api_key_header?: string;
+  };
+  is_default?: boolean;
+}
+
+export interface WorkflowImportRequest {
+  mode: 'yaml-content' | 'yaml-url';
+  yaml_content?: string;
+  yaml_url?: string;
+  name?: string;
+  description?: string;
+  icon_type?: 'emoji' | 'link';
+  icon?: string;
+  icon_background?: string;
+  app_id?: string;
+  target_instance_id?: string; // 目标Dify实例ID
+}
+
+export interface WorkflowImportResponse {
+  id: string;
+  status: 'completed' | 'completed-with-warnings' | 'pending' | 'failed';
+  app_id?: string;
+  app_mode?: string;
+  current_dsl_version?: string;
+  imported_dsl_version?: string;
+  error?: string;
+  warnings?: string[];
+  dependencies?: ImportDependency[];
+}
+
+export interface ImportDependency {
+  type: 'tool' | 'model_provider' | 'rerank_model';
+  value: any;
+  current_identifier?: string;
+  missing?: boolean;
+}
+
+export interface BatchImportRequest {
+  files: WorkflowImportFile[];
+  target_instance_id: string;
+  import_options: {
+    overwrite_existing: boolean;
+    ignore_errors: boolean;
+    create_new_on_conflict: boolean;
+  };
+}
+
+export interface WorkflowImportFile {
+  filename: string;
+  content: string;
+  name?: string;
+  description?: string;
+}
+
+export interface BatchImportResult {
+  filename: string;
+  success: boolean;
+  app_id?: string;
+  app_name?: string;
+  import_id?: string;
+  status?: WorkflowImportResponse['status'];
+  error?: string;
+  warnings?: string[];
+}
+
+export interface BatchImportResponse {
+  results: BatchImportResult[];
+  success_count: number;
+  total_count: number;
+  failed_count: number;
+  warning_count: number;
 } 

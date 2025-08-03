@@ -37,17 +37,16 @@ database:
 api:
   # Dify API基础URL - 请修改为您的Dify API地址
   base_url: https://your-dify-instance.com/
-  
   # API认证方式 - 支持三种认证方式：
   auth:
-    # 方式一：Bearer Token认证（推荐）
-    type: bearer  # bearer, basic, api_key
-    token: 'your_api_token_here'  # 请填写您的API Token
+    # # 方式一：Bearer Token认证（推荐）
+    # type: bearer  # bearer, basic, api_key
+    # token: 'your_console_api_token_here'  # 请填写您的Console API Token
     
     # 方式二：用户名密码认证（基本认证）
-    # type: basic
-    # username: your_username_here  # 您的Dify用户名
-    # password: your_password_here  # 您的Dify密码
+    type: basic
+    username: your_username_here  # 您的Dify用户名
+    password: your_password_here  # 您的Dify密码
     
     # 方式三：API Key认证
     # type: api_key
@@ -60,6 +59,7 @@ api:
     apps_list: '/console/api/apps'  # 获取应用列表
     app_detail: '/console/api/apps/{app_id}'  # 获取单个应用详情
     app_export: '/console/api/apps/{app_id}/export'  # 应用导出
+    app_import: '/console/api/apps/imports'  # 应用导入
     
     # 工作流相关端点  
     workflow_draft: '/console/api/apps/{app_id}/workflows/draft'  # 获取工作流草稿
@@ -67,6 +67,11 @@ api:
     
     # 环境变量端点
     environment_variables: '/console/api/apps/{app_id}/variables'  # 应用环境变量
+    
+    # 导入相关端点
+    import_status: '/console/api/apps/imports/{import_id}'  # 获取导入状态
+    import_confirm: '/console/api/apps/imports/{import_id}/confirm'  # 确认导入
+    check_dependencies: '/console/api/apps/imports/{import_id}/check-dependencies'  # 检查依赖
     
   # API查询参数配置
   params:
@@ -105,3 +110,35 @@ logging:
 cache:
   enabled: true
   ttl: 300  # 缓存过期时间(秒)
+
+# 目标Dify实例配置 (用于工作流导入)
+target_instances:
+  # 默认实例（本地或当前连接的Dify实例）
+  - id: default
+    name: 本地Dify实例
+    url: https://your-dify-instance.com/
+    auth:
+      type: bearer  # bearer, basic, api_key
+      token: 'your_console_api_token_here'
+      # type: basic
+      # username: your_username_here  # 您的Dify用户名
+      # password: your_password_here  # 您的Dify密码
+    is_default: true
+    
+  # 可以配置多个目标实例
+  - id: production
+    name: 生产环境Dify
+    url: https://prod-dify.company.com/
+    auth:
+      type: bearer
+      token: 'prod_console_api_token_here'
+    is_default: false
+  #   
+  - id: staging
+    name: 测试环境Dify
+    url: https://staging-dify.company.com/
+    auth:
+      type: basic
+      username: admin
+      password: admin_password
+    is_default: false

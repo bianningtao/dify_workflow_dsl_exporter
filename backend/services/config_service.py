@@ -240,6 +240,109 @@ class ConfigService:
         if cache_config.get('type') == 'file':
             cache_dir = Path(cache_config.get('file', {}).get('cache_dir', './cache'))
             cache_dir.mkdir(parents=True, exist_ok=True)
+    
+    def get_target_instances(self) -> list:
+        """获取目标Dify实例配置列表"""
+        return self._config.get('target_instances', [])
+    
+    def get_target_instance_by_id(self, instance_id: str) -> Optional[Dict[str, Any]]:
+        """根据ID获取目标实例配置"""
+        instances = self.get_target_instances()
+        for instance in instances:
+            if instance.get('id') == instance_id:
+                return instance
+        return None
+    
+    def get_default_target_instance(self) -> Optional[Dict[str, Any]]:
+        """获取默认目标实例配置"""
+        instances = self.get_target_instances()
+        # 首先查找标记为默认的实例
+        for instance in instances:
+            if instance.get('is_default', False):
+                return instance
+        # 如果没有默认实例，返回第一个
+        return instances[0] if instances else None
+    
+    def get_target_instance_headers(self, instance_id: str) -> Dict[str, str]:
+        """获取指定目标实例的API请求头"""
+        instance = self.get_target_instance_by_id(instance_id)
+        if not instance:
+            return {}
+        
+        auth_config = instance.get('auth', {})
+        headers = {'Content-Type': 'application/json'}
+        
+        if auth_config.get('type') == 'bearer':
+            headers['Authorization'] = f"Bearer {auth_config.get('token', '')}"
+        elif auth_config.get('type') == 'basic':
+            import base64
+            username = auth_config.get('username', '')
+            password = auth_config.get('password', '')
+            credentials = base64.b64encode(f"{username}:{password}".encode('utf-8')).decode('utf-8')
+            headers['Authorization'] = f"Basic {credentials}"
+        elif auth_config.get('type') == 'api_key':
+            header_name = auth_config.get('api_key_header', 'X-API-Key')
+            headers[header_name] = auth_config.get('api_key', '')
+        
+        return headers
+    
+    def get_target_instance_base_url(self, instance_id: str) -> str:
+        """获取指定目标实例的基础URL"""
+        instance = self.get_target_instance_by_id(instance_id)
+        if not instance:
+            raise ValueError(f"目标实例 {instance_id} 不存在")
+        
+        base_url = instance.get('url', '').rstrip('/')
+        if not base_url:
+            raise ValueError(f"目标实例 {instance_id} 的URL配置为空")
+        
+        return base_url
+    
+    def get_api_endpoint(self, endpoint_name: str, **kwargs) -> str:
+        """获取API端点URL
+        
+        Args:
+            endpoint_name: 端点名称，如 'app_import', 'import_confirm' 等
+            **kwargs: 用于格式化端点URL的参数，如 app_id, import_id 等
+            
+        Returns:
+            str: 格式化后的端点URL
+            
+        Raises:
+            ValueError: 当端点不存在时
+        """
+        api_config = self._config.get('api', {})
+        endpoints = api_config.get('endpoints', {})
+        
+        if endpoint_name not in endpoints:
+            raise ValueError(f"API端点 '{endpoint_name}' 未在配置中找到")
+        
+        endpoint_template = endpoints[endpoint_name]
+        
+        try:
+            # 使用kwargs格式化端点URL
+            return endpoint_template.format(**kwargs)
+        except KeyError as e:
+            raise ValueError(f"格式化端点URL时缺少参数: {e}")
+    
+    def get_full_api_url(self, endpoint_name: str, instance_id: str = None, **kwargs) -> str:
+        """获取完整的API URL
+        
+        Args:
+            endpoint_name: 端点名称
+            instance_id: 目标实例ID，如果为None则使用主API配置
+            **kwargs: 用于格式化端点URL的参数
+            
+        Returns:
+            str: 完整的API URL
+        """
+        if instance_id:
+            base_url = self.get_target_instance_base_url(instance_id)
+        else:
+            base_url = self.get_api_base_url().rstrip('/')
+        
+        endpoint_path = self.get_api_endpoint(endpoint_name, **kwargs)
+        return f"{base_url}{endpoint_path}"
 
 
 # 全局配置实例

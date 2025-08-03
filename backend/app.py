@@ -3,6 +3,14 @@ from flask_restful import Api
 from flask_cors import CORS
 from controllers.app_controller import AppExportApi
 from controllers.workflow_controller import WorkflowDraftApi, WorkflowListApi, WorkflowBatchExportApi, WorkflowRefreshApi, ApiTestApi
+from controllers.workflow_import_controller import (
+    WorkflowImportApi, 
+    WorkflowImportConfirmApi, 
+    WorkflowBatchImportApi, 
+    TargetInstancesApi, 
+    TargetInstanceTestApi, 
+    WorkflowFileValidateApi
+)
 from services.config_service import config
 import os
 import logging
@@ -46,6 +54,14 @@ def create_app():
     api.add_resource(WorkflowBatchExportApi, "/api/workflows/batch-export")
     api.add_resource(WorkflowRefreshApi, "/api/workflows/refresh")
     api.add_resource(ApiTestApi, "/api/test-connection")
+    
+    # 工作流导入相关路由
+    api.add_resource(WorkflowImportApi, "/api/workflows/import")
+    api.add_resource(WorkflowImportConfirmApi, "/api/workflows/import/<string:import_id>/confirm")
+    api.add_resource(WorkflowBatchImportApi, "/api/workflows/batch-import")
+    api.add_resource(TargetInstancesApi, "/api/target-instances")
+    api.add_resource(TargetInstanceTestApi, "/api/target-instances/<string:instance_id>/test")
+    api.add_resource(WorkflowFileValidateApi, "/api/workflows/validate")
     
     return app
 

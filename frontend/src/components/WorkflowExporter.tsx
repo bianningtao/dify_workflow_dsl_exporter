@@ -1,19 +1,39 @@
 import React, { useState, useEffect } from 'react';
 import { useWorkflowExport } from '../hooks/useWorkflowExport';
 import { useBatchWorkflowExport } from '../hooks/useBatchWorkflowExport';
-import { Workflow, WorkflowSummary } from '../types';
+import { Workflow, WorkflowSummary, WorkflowImportResponse, BatchImportResponse } from '../types';
 import ExportConfirmModal from './ExportConfirmModal';
 import BatchExportModal from './BatchExportModal';
+import WorkflowImporter from './WorkflowImporter';
+import BatchImportModal from './BatchImportModal';
+import SuccessModal from './SuccessModal';
 import AppTypeTag from './AppTypeTag';
 import AppTypeStats from './AppTypeStats';
 import Pagination from './Pagination';
 
 const WorkflowExporter: React.FC = () => {
-  const [mode, setMode] = useState<'single' | 'batch'>('batch');
+  // 主菜单模式：export 或 import
+  const [mainMode, setMainMode] = useState<'export' | 'import'>('export');
+  // 子菜单模式：batch 或 single
+  const [subMode, setSubMode] = useState<'batch' | 'single'>('batch');
   const [appId, setAppId] = useState('');
   const [workflow, setWorkflow] = useState<Workflow | null>(null);
   const [showSingleModal, setShowSingleModal] = useState(false);
   const [showBatchModal, setShowBatchModal] = useState(false);
+  const [showBatchImportModal, setShowBatchImportModal] = useState(false);
+  
+  // 成功弹窗状态
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [successData, setSuccessData] = useState<{
+    title: string;
+    message: string;
+    appId?: string;
+    statistics?: {
+      successCount: number;
+      totalCount: number;
+      failedCount: number;
+    };
+  } | null>(null);
   
   // 单个工作流导出相关
   const { exportWorkflow, getWorkflowDraft, exporting: singleExporting, loading: singleLoading, error: singleError } = useWorkflowExport();
@@ -111,41 +131,104 @@ const WorkflowExporter: React.FC = () => {
   const selectedWorkflowsData = workflows.filter(w => selectedWorkflows.has(w.app_id));
   const hasSecretVariables = selectedWorkflowsData.some(w => w.has_secret_variables);
 
+  // 导入成功处理
+  const handleImportSuccess = (result: WorkflowImportResponse | BatchImportResponse) => {
+    // 刷新工作流列表
+    refreshWorkflows();
+    
+    // 显示优雅的成功弹窗
+    if ('results' in result) {
+      // 批量导入结果
+      setSuccessData({
+        title: '批量导入完成！',
+        message: `成功处理了您的工作流批量导入请求`,
+        statistics: {
+          successCount: result.success_count,
+          totalCount: result.total_count,
+          failedCount: result.failed_count
+        }
+      });
+    } else {
+      // 单个导入结果
+      setSuccessData({
+        title: '工作流导入成功！',
+        message: '您的工作流已成功导入到目标实例',
+        appId: result.app_id
+      });
+    }
+    setShowSuccessModal(true);
+  };
+
   return (
     <div className="max-w-7xl mx-auto p-6">
-      <h1 className="text-3xl font-bold mb-8 text-center">工作流 DSL 导出器</h1>
+      <h1 className="text-3xl font-bold mb-8 text-center">工作流 DSL 管理器</h1>
       
-      {/* 模式切换 */}
+      {/* 主菜单 */}
       <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-        <div className="flex items-center space-x-6 mb-4">
+        <div className="flex items-center justify-center space-x-8">
+          <button
+            onClick={() => {
+              setMainMode('export');
+              setSubMode('batch');
+            }}
+            className={`px-8 py-3 rounded-lg font-medium text-lg transition-all duration-200 ${
+              mainMode === 'export'
+                ? 'bg-blue-600 text-white shadow-lg'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
+          >
+            📤 工作流导出
+          </button>
+          <button
+            onClick={() => {
+              setMainMode('import');
+              setSubMode('single');
+            }}
+            className={`px-8 py-3 rounded-lg font-medium text-lg transition-all duration-200 ${
+              mainMode === 'import'
+                ? 'bg-green-600 text-white shadow-lg'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
+          >
+            📥 工作流导入
+          </button>
+        </div>
+      </div>
+
+      {mainMode === 'export' ? (
+        // 导出页面
+        <div className="space-y-6">
+          {/* 导出子菜单 */}
+          <div className="bg-white rounded-lg shadow-md p-4">
+            <div className="flex items-center justify-center space-x-4">
+              <span className="font-medium text-gray-700">导出方式:</span>
           <label className="flex items-center">
             <input
               type="radio"
-              name="mode"
+                  name="exportMode"
               value="batch"
-              checked={mode === 'batch'}
-              onChange={(e) => setMode(e.target.value as 'batch')}
+                  checked={subMode === 'batch'}
+                  onChange={() => setSubMode('batch')}
               className="mr-2"
             />
-            <span className="font-medium">批量导出模式</span>
+                <span className="font-medium">批量导出</span>
           </label>
           <label className="flex items-center">
             <input
               type="radio"
-              name="mode"
+                  name="exportMode"
               value="single"
-              checked={mode === 'single'}
-              onChange={(e) => setMode(e.target.value as 'single')}
+                  checked={subMode === 'single'}
+                  onChange={() => setSubMode('single')}
               className="mr-2"
             />
-            <span className="font-medium">单个导出模式</span>
+                <span className="font-medium">单个导出</span>
           </label>
         </div>
       </div>
 
-      {mode === 'batch' ? (
+          {subMode === 'batch' ? (
         // 批量导出模式
-        <div className="space-y-6">
           <div className="bg-white rounded-lg shadow-md p-6">
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-xl font-semibold">工作流列表</h2>
@@ -373,7 +456,6 @@ const WorkflowExporter: React.FC = () => {
                 {batchLoading ? '加载中...' : searchKeyword ? '没有找到匹配的工作流' : '暂无工作流数据'}
               </div>
             )}
-          </div>
         </div>
       ) : (
         // 单个导出模式
@@ -480,6 +562,67 @@ const WorkflowExporter: React.FC = () => {
               ))}
             </div>
           </div>
+        </div>
+          )}
+        </div>
+          )}
+        </div>
+      ) : (
+        // 导入页面
+        <div className="space-y-6">
+          {/* 导入子菜单 */}
+          <div className="bg-white rounded-lg shadow-md p-4">
+            <div className="flex items-center justify-center space-x-4">
+              <span className="font-medium text-gray-700">导入方式:</span>
+              <label className="flex items-center">
+                <input
+                  type="radio"
+                  name="importMode"
+                  value="single"
+                  checked={subMode === 'single'}
+                  onChange={() => setSubMode('single')}
+                  className="mr-2"
+                />
+                <span className="font-medium">单个导入</span>
+              </label>
+              <label className="flex items-center">
+                <input
+                  type="radio"
+                  name="importMode"
+                  value="batch"
+                  checked={subMode === 'batch'}
+                  onChange={() => setSubMode('batch')}
+                  className="mr-2"
+                />
+                <span className="font-medium">批量导入</span>
+              </label>
+            </div>
+          </div>
+
+          {subMode === 'single' ? (
+            // 单个导入模式 - 调整宽度与菜单栏一致
+            <div className="bg-white rounded-lg shadow-md">
+              <WorkflowImporter
+                onImportSuccess={handleImportSuccess}
+                onClose={() => setMainMode('export')}
+                className="w-full"
+              />
+            </div>
+          ) : (
+            // 批量导入模式
+            <div className="bg-white rounded-lg shadow-md p-6">
+              <div className="text-center">
+                <h2 className="text-xl font-semibold mb-4">批量工作流导入</h2>
+                <p className="text-gray-600 mb-6">
+                  选择多个YAML文件进行批量导入工作流
+                </p>
+                <button
+                  onClick={() => setShowBatchImportModal(true)}
+                  className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 text-lg font-medium"
+                >
+                  开始批量导入
+                </button>
+          </div>
             </div>
           )}
         </div>
@@ -499,6 +642,25 @@ const WorkflowExporter: React.FC = () => {
         onConfirm={handleConfirmBatchExport}
         selectedWorkflows={selectedWorkflowsData}
         hasSecretVariables={hasSecretVariables}
+      />
+
+      <BatchImportModal
+        isOpen={showBatchImportModal}
+        onClose={() => setShowBatchImportModal(false)}
+        onImportSuccess={handleImportSuccess}
+      />
+
+      {/* 成功弹窗 */}
+      <SuccessModal
+        isOpen={showSuccessModal}
+        onClose={() => {
+          setShowSuccessModal(false);
+          setSuccessData(null);
+        }}
+        title={successData?.title || ''}
+        message={successData?.message || ''}
+        appId={successData?.appId}
+        statistics={successData?.statistics}
       />
     </div>
   );
