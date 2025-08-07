@@ -154,8 +154,8 @@ npm run dev
 
 - **Docker Compose用户**：如果使用Docker Compose启动，应用将在 http://localhost:8080 访问
 
-![alt text](<images/image2.png>)
-![alt text](<images/image3.png>)
+![alt text](http://t0m0afap2.hd-bkt.clouddn.com/image2.png)
+![alt text](http://t0m0afap2.hd-bkt.clouddn.com/image3.png)
 
 ## ⚙️ 配置系统
 
