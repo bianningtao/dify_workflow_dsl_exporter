@@ -12,7 +12,7 @@ import {
 } from '../types';
 
 // 使用相对路径，在Docker中通过Nginx代理，在开发中直接访问后端
-const API_BASE_URL = process.env.NODE_ENV === 'production' ? '/api' : 'http://localhost:5000/api';
+const API_BASE_URL = process.env.NODE_ENV === 'production' ? '/api' : 'http://localhost:5001/api';
 
 export class ApiService {
   static async exportAppConfig(appId: string, includeSecret: boolean = false): Promise<{ data: string }> {

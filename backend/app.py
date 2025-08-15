@@ -42,7 +42,7 @@ def create_app():
         raise
     
     # 配置CORS
-    CORS(app, origins=["http://localhost:3000"])
+    CORS(app, origins=["http://localhost:3000", "http://localhost:3001"])
     
     # 创建API实例
     api = Api(app)
@@ -67,4 +67,4 @@ def create_app():
 
 if __name__ == "__main__":
     app = create_app()
-    app.run(debug=True, host="0.0.0.0", port=5000) 
+    app.run(debug=True, host="0.0.0.0", port=5001) 

@@ -194,6 +194,8 @@ class WorkflowImportService:
         failed_count = 0
         warning_count = 0
         
+        logger.info(f"开始批量导入 {len(workflow_files)} 个工作流文件到实例 {target_instance_id}")
+        
         for workflow_file in workflow_files:
             filename = workflow_file.get('filename', 'unknown.yaml')
             content = workflow_file.get('content', '')
@@ -229,14 +231,21 @@ class WorkflowImportService:
                 result = self.import_single_workflow(target_instance_id, import_data)
                 
                 # 处理需要确认的导入
-                if result.get('requires_confirmation', False) and not import_options.get('ignore_errors', False):
+                if result.get('status') == 'pending' or result.get('requires_confirmation', False):
+                    # 在批量导入中，自动确认所有需要确认的导入
+                    logger.info(f"文件 {filename} 需要确认导入，正在自动确认...")
                     confirm_result = self.confirm_import(
                         target_instance_id, 
                         result.get('import_id')
                     )
                     if confirm_result.get('success'):
                         result.update(confirm_result)
-                        result['status'] = confirm_result.get('status')
+                        result['status'] = confirm_result.get('status', 'completed')
+                        logger.info(f"文件 {filename} 导入确认成功，状态: {result['status']}")
+                    else:
+                        result['success'] = False
+                        result['error'] = confirm_result.get('error', '确认导入失败')
+                        logger.error(f"文件 {filename} 导入确认失败: {result['error']}")
                 
                 # 统计结果
                 if result.get('success'):
@@ -245,8 +254,7 @@ class WorkflowImportService:
                         warning_count += 1
                 else:
                     failed_count += 1
-                    if import_options.get('ignore_errors', False):
-                        logger.warning(f"忽略文件 {filename} 的导入错误: {result.get('error')}")
+                    logger.warning(f"文件 {filename} 导入失败: {result.get('error')}")
                     
                 results.append({
                     'filename': filename,
@@ -270,9 +278,14 @@ class WorkflowImportService:
                     'error': error_msg
                 })
                 
-                if not import_options.get('ignore_errors', False):
-                    logger.error(f"批量导入因错误停止: {error_msg}")
+                # 只有在严重错误且用户明确设置不忽略错误时才停止
+                if not import_options.get('ignore_errors', False) and isinstance(e, (ConnectionError, TimeoutError)):
+                    logger.error(f"批量导入因严重错误停止: {error_msg}")
                     break
+                else:
+                    logger.warning(f"文件 {filename} 处理失败，继续处理下一个文件: {error_msg}")
+        
+        logger.info(f"批量导入完成 - 总计: {len(workflow_files)}, 成功: {success_count}, 失败: {failed_count}, 警告: {warning_count}")
         
         return {
             'results': results,

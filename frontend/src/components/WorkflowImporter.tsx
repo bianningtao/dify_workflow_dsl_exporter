@@ -181,7 +181,7 @@ const WorkflowImporter: React.FC<WorkflowImporterProps> = ({
       setLoading(true);
       setError(null);
       
-      const result = await ApiService.confirmImport(pendingImport.id, targetInstanceId);
+      const result = await ApiService.confirmImport(pendingImport.import_id, targetInstanceId);
       
       if (result.status === 'completed' || result.status === 'completed-with-warnings') {
         // 显示优雅的成功弹窗

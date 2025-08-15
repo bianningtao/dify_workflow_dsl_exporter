@@ -132,7 +132,7 @@ export interface WorkflowImportRequest {
 }
 
 export interface WorkflowImportResponse {
-  id: string;
+  import_id: string;
   status: 'completed' | 'completed-with-warnings' | 'pending' | 'failed';
   app_id?: string;
   app_mode?: string;

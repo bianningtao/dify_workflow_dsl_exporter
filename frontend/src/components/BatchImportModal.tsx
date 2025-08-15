@@ -24,7 +24,7 @@ const BatchImportModal: React.FC<BatchImportModalProps> = ({
   const [targetInstanceId, setTargetInstanceId] = useState(''); // 确保初始为空
   const [importOptions, setImportOptions] = useState({
     overwrite_existing: false,
-    ignore_errors: false,
+    ignore_errors: true, // 默认忽略错误，继续处理其他文件
     create_new_on_conflict: true
   });
   

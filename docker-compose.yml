@@ -6,7 +6,7 @@ services:
     container_name: workflow-dsl-exporter
     ports:
       - "80:80"
-      - "5000:5000"
+      - "5001:5001"
     volumes:
       - ./logs:/app/logs
       - ./data:/app/data
