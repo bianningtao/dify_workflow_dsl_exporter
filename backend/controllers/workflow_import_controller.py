@@ -13,6 +13,17 @@ class WorkflowImportApi(Resource):
     def post(self):
         """导入单个工作流"""
         try:
+            # 获取当前用户信息
+            user_id = None
+            token = request.headers.get('Authorization')
+            if token:
+                if token.startswith('Bearer '):
+                    token = token[7:]
+                from services.auth_service import auth_service
+                payload = auth_service.verify_token(token)
+                if payload:
+                    user_id = payload.get('user_id')
+            
             data = request.get_json()
             
             # 验证必需参数
@@ -48,7 +59,7 @@ class WorkflowImportApi(Resource):
             
             # 执行导入
             result = workflow_import_service.import_single_workflow(
-                target_instance_id, import_data
+                target_instance_id, import_data, user_id
             )
             
             if result.get('success'):
@@ -67,6 +78,17 @@ class WorkflowImportConfirmApi(Resource):
     def post(self, import_id):
         """确认待处理的导入"""
         try:
+            # 获取当前用户信息
+            user_id = None
+            token = request.headers.get('Authorization')
+            if token:
+                if token.startswith('Bearer '):
+                    token = token[7:]
+                from services.auth_service import auth_service
+                payload = auth_service.verify_token(token)
+                if payload:
+                    user_id = payload.get('user_id')
+            
             data = request.get_json() or {}
             target_instance_id = data.get('target_instance_id')
             
@@ -75,7 +97,7 @@ class WorkflowImportConfirmApi(Resource):
             
             # 执行确认
             result = workflow_import_service.confirm_import(
-                target_instance_id, import_id
+                target_instance_id, import_id, user_id
             )
             
             if result.get('success'):
@@ -94,6 +116,17 @@ class WorkflowBatchImportApi(Resource):
     def post(self):
         """批量导入工作流"""
         try:
+            # 获取当前用户信息
+            user_id = None
+            token = request.headers.get('Authorization')
+            if token:
+                if token.startswith('Bearer '):
+                    token = token[7:]
+                from services.auth_service import auth_service
+                payload = auth_service.verify_token(token)
+                if payload:
+                    user_id = payload.get('user_id')
+            
             data = request.get_json()
             
             # 验证必需参数
@@ -120,7 +153,7 @@ class WorkflowBatchImportApi(Resource):
             
             # 执行批量导入
             result = workflow_import_service.batch_import_workflows(
-                target_instance_id, files, import_options
+                target_instance_id, files, import_options, user_id
             )
             
             return result, 200
@@ -136,7 +169,18 @@ class TargetInstancesApi(Resource):
     def get(self):
         """获取所有可用的目标实例"""
         try:
-            instances = workflow_import_service.get_target_instances()
+            # 尝试获取当前用户信息
+            user_id = None
+            token = request.headers.get('Authorization')
+            if token:
+                if token.startswith('Bearer '):
+                    token = token[7:]
+                from services.auth_service import auth_service
+                payload = auth_service.verify_token(token)
+                if payload:
+                    user_id = payload.get('user_id')
+            
+            instances = workflow_import_service.get_target_instances(user_id)
             return {'instances': instances}, 200
             
         except Exception as e:
@@ -150,7 +194,18 @@ class TargetInstanceTestApi(Resource):
     def post(self, instance_id):
         """测试指定目标实例的连接"""
         try:
-            status = workflow_import_service._test_instance_connection(instance_id)
+            # 尝试获取当前用户信息
+            user_id = None
+            token = request.headers.get('Authorization')
+            if token:
+                if token.startswith('Bearer '):
+                    token = token[7:]
+                from services.auth_service import auth_service
+                payload = auth_service.verify_token(token)
+                if payload:
+                    user_id = payload.get('user_id')
+            
+            status = workflow_import_service._test_instance_connection(instance_id, user_id)
             return {'instance_id': instance_id, 'status': status}, 200
             
         except Exception as e:

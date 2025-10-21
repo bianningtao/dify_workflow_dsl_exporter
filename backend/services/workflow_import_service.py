@@ -23,10 +23,61 @@ class WorkflowImportService:
         self.retry_count = 3
         self.retry_delay = 1
     
+    def _get_instance_config(self, target_instance_id: str, user_id: str = None) -> tuple[Optional[Dict[str, Any]], Optional[Dict[str, str]], Optional[str]]:
+        """
+        获取目标实例的配置、请求头和基础URL
+        
+        Args:
+            target_instance_id: 目标实例ID
+            user_id: 用户ID，如果提供则从用户配置中获取
+            
+        Returns:
+            (instance_config, headers, base_url) 的元组
+        """
+        if user_id:
+            from services.user_config_service import user_config_service
+            instances = user_config_service.get_user_target_instances(user_id)
+            instance = next((inst for inst in instances if inst['id'] == target_instance_id), None)
+            
+            if not instance:
+                return None, None, None
+            
+            # 构建请求头
+            auth_config = instance.get('auth', {})
+            auth_type = auth_config.get('type', 'bearer')
+            headers = {'Content-Type': 'application/json'}
+            
+            if auth_type == 'bearer':
+                token = auth_config.get('token', '')
+                headers['Authorization'] = f"Bearer {token}"
+            elif auth_type == 'basic':
+                username = auth_config.get('username', '')
+                password = auth_config.get('password', '')
+                credentials = base64.b64encode(f"{username}:{password}".encode()).decode()
+                headers['Authorization'] = f"Basic {credentials}"
+            elif auth_type == 'api_key':
+                api_key = auth_config.get('api_key', '')
+                header_name = auth_config.get('api_key_header', 'X-API-Key')
+                headers[header_name] = api_key
+            
+            base_url = instance.get('url', '').rstrip('/')
+            return instance, headers, base_url
+        else:
+            # 使用系统配置
+            instance = config.get_target_instance_by_id(target_instance_id)
+            if not instance:
+                return None, None, None
+            
+            headers = config.get_target_instance_headers(target_instance_id)
+            # 从系统配置获取base_url
+            base_url = instance.get('url', '').rstrip('/')
+            return instance, headers, base_url
+    
     def import_single_workflow(
         self,
         target_instance_id: str,
-        import_data: Dict[str, Any]
+        import_data: Dict[str, Any],
+        user_id: str = None
     ) -> Dict[str, Any]:
         """
         导入单个工作流到目标Dify实例
@@ -34,24 +85,26 @@ class WorkflowImportService:
         Args:
             target_instance_id: 目标实例ID
             import_data: 导入数据，包含mode、yaml_content等
+            user_id: 用户ID，如果提供则从用户配置中获取实例信息
             
         Returns:
             导入结果
         """
         try:
             # 获取目标实例配置
-            instance = config.get_target_instance_by_id(target_instance_id)
+            instance, headers, base_url = self._get_instance_config(target_instance_id, user_id)
+            
             if not instance:
                 return {
                     'success': False,
                     'error': f'目标实例 {target_instance_id} 不存在'
                 }
             
-            # 构建导入请求
-            headers = config.get_target_instance_headers(target_instance_id)
-            
-            # 导入API端点（使用配置化端点）
-            import_url = config.get_full_api_url('app_import', target_instance_id)
+            # 构建导入URL
+            if user_id:
+                import_url = f"{base_url}/console/api/apps/imports"
+            else:
+                import_url = config.get_full_api_url('app_import', target_instance_id)
             
             # 准备请求数据
             request_data = {
@@ -122,7 +175,8 @@ class WorkflowImportService:
     def confirm_import(
         self,
         target_instance_id: str,
-        import_id: str
+        import_id: str,
+        user_id: str = None
     ) -> Dict[str, Any]:
         """
         确认待处理的导入
@@ -130,15 +184,26 @@ class WorkflowImportService:
         Args:
             target_instance_id: 目标实例ID
             import_id: 导入ID
+            user_id: 用户ID，如果提供则从用户配置中获取实例信息
             
         Returns:
             确认结果
         """
         try:
-            headers = config.get_target_instance_headers(target_instance_id)
+            # 获取目标实例配置
+            instance, headers, base_url = self._get_instance_config(target_instance_id, user_id)
             
-            # 确认导入API端点（使用配置化端点）
-            confirm_url = config.get_full_api_url('import_confirm', target_instance_id, import_id=import_id)
+            if not instance:
+                return {
+                    'success': False,
+                    'error': f'目标实例 {target_instance_id} 不存在'
+                }
+            
+            # 构建确认URL
+            if user_id:
+                confirm_url = f"{base_url}/console/api/apps/imports/{import_id}/confirm"
+            else:
+                confirm_url = config.get_full_api_url('import_confirm', target_instance_id, import_id=import_id)
             
             response = self._make_request_with_retry(
                 'POST', confirm_url, headers=headers
@@ -176,7 +241,8 @@ class WorkflowImportService:
         self,
         target_instance_id: str,
         workflow_files: List[Dict[str, Any]],
-        import_options: Dict[str, Any]
+        import_options: Dict[str, Any],
+        user_id: str = None
     ) -> Dict[str, Any]:
         """
         批量导入工作流
@@ -185,6 +251,7 @@ class WorkflowImportService:
             target_instance_id: 目标实例ID
             workflow_files: 工作流文件列表 [{'filename': '', 'content': '', 'name': '', 'description': ''}]
             import_options: 导入选项 {'overwrite_existing': bool, 'ignore_errors': bool, 'create_new_on_conflict': bool}
+            user_id: 用户ID，如果提供则从用户配置中获取实例信息
             
         Returns:
             批量导入结果
@@ -222,13 +289,14 @@ class WorkflowImportService:
                 if import_options.get('overwrite_existing', False):
                     existing_app = self._find_app_by_name(
                         target_instance_id, 
-                        import_data.get('name', '')
+                        import_data.get('name', ''),
+                        user_id
                     )
                     if existing_app:
                         import_data['app_id'] = existing_app['id']
                 
                 # 执行导入
-                result = self.import_single_workflow(target_instance_id, import_data)
+                result = self.import_single_workflow(target_instance_id, import_data, user_id)
                 
                 # 处理需要确认的导入
                 if result.get('status') == 'pending' or result.get('requires_confirmation', False):
@@ -236,7 +304,8 @@ class WorkflowImportService:
                     logger.info(f"文件 {filename} 需要确认导入，正在自动确认...")
                     confirm_result = self.confirm_import(
                         target_instance_id, 
-                        result.get('import_id')
+                        result.get('import_id'),
+                        user_id
                     )
                     if confirm_result.get('success'):
                         result.update(confirm_result)
@@ -295,13 +364,21 @@ class WorkflowImportService:
             'warning_count': warning_count
         }
     
-    def _find_app_by_name(self, target_instance_id: str, app_name: str) -> Optional[Dict[str, Any]]:
+    def _find_app_by_name(self, target_instance_id: str, app_name: str, user_id: str = None) -> Optional[Dict[str, Any]]:
         """在目标实例中查找指定名称的应用"""
         try:
-            headers = config.get_target_instance_headers(target_instance_id)
+            # 获取目标实例配置
+            instance, headers, base_url = self._get_instance_config(target_instance_id, user_id)
             
-            # 应用列表API端点（使用配置化端点）
-            apps_url = config.get_full_api_url('apps_list', target_instance_id)
+            if not instance:
+                return None
+            
+            # 构建应用列表URL
+            if user_id:
+                apps_url = f"{base_url}/console/api/apps"
+            else:
+                apps_url = config.get_full_api_url('apps_list', target_instance_id)
+            
             params = {'name': app_name, 'limit': 100}
             
             response = self._make_request_with_retry(
@@ -322,9 +399,20 @@ class WorkflowImportService:
             logger.exception(f"查找应用时发生错误: {e}")
             return None
     
-    def get_target_instances(self) -> List[Dict[str, Any]]:
-        """获取所有可用的目标实例"""
-        instances = config.get_target_instances()
+    def get_target_instances(self, user_id: str = None) -> List[Dict[str, Any]]:
+        """获取所有可用的目标实例
+        
+        Args:
+            user_id: 用户ID，如果提供则获取用户配置的实例，否则获取系统配置的实例
+        """
+        # 如果提供了用户ID，从用户配置中获取
+        if user_id:
+            from services.user_config_service import user_config_service
+            instances = user_config_service.get_user_target_instances(user_id)
+        else:
+            # 否则从系统配置中获取
+            instances = config.get_target_instances()
+        
         result = []
         
         for instance in instances:
@@ -340,13 +428,50 @@ class WorkflowImportService:
         
         return result
     
-    def _test_instance_connection(self, instance_id: str) -> str:
-        """测试目标实例的连接状态"""
+    def _test_instance_connection(self, instance_id: str, user_id: str = None) -> str:
+        """测试目标实例的连接状态
+        
+        Args:
+            instance_id: 实例ID
+            user_id: 用户ID，如果提供则从用户配置中获取实例信息
+        """
         try:
-            headers = config.get_target_instance_headers(instance_id)
-            
-            # 尝试访问应用列表API来测试连接（使用配置化端点）
-            test_url = config.get_full_api_url('apps_list', instance_id)
+            # 获取实例信息
+            if user_id:
+                from services.user_config_service import user_config_service
+                instances = user_config_service.get_user_target_instances(user_id)
+                instance = next((inst for inst in instances if inst['id'] == instance_id), None)
+                
+                if not instance:
+                    logger.error(f"未找到用户实例: {instance_id}")
+                    return 'unknown_error'
+                
+                # 构建请求头
+                auth_config = instance.get('auth', {})
+                auth_type = auth_config.get('type', 'bearer')
+                headers = {'Content-Type': 'application/json'}
+                
+                if auth_type == 'bearer':
+                    token = auth_config.get('token', '')
+                    headers['Authorization'] = f"Bearer {token}"
+                elif auth_type == 'basic':
+                    username = auth_config.get('username', '')
+                    password = auth_config.get('password', '')
+                    import base64
+                    credentials = base64.b64encode(f"{username}:{password}".encode()).decode()
+                    headers['Authorization'] = f"Basic {credentials}"
+                elif auth_type == 'api_key':
+                    api_key = auth_config.get('api_key', '')
+                    header_name = auth_config.get('api_key_header', 'X-API-Key')
+                    headers[header_name] = api_key
+                
+                # 构建测试URL
+                base_url = instance.get('url', '').rstrip('/')
+                test_url = f"{base_url}/console/api/apps?page=1&limit=1"
+            else:
+                # 使用系统配置
+                headers = config.get_target_instance_headers(instance_id)
+                test_url = config.get_full_api_url('apps_list', instance_id)
             
             response = requests.get(
                 test_url, 

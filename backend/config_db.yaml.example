@@ -1,0 +1,144 @@
+# ============================================
+# 系统配置文件示例
+# 复制此文件为 config_db.yaml 并修改相应配置
+# ============================================
+
+# 配置数据库连接信息
+config_database:
+  # 数据库类型（目前仅支持mysql）
+  type: mysql
+  
+  # 数据库主机地址
+  host: localhost
+  
+  # 数据库端口
+  port: 3306
+  
+  # 数据库名称
+  database: dify_workflow_config
+  
+  # 数据库用户名
+  username: root
+  
+  # 数据库密码
+  password: ''
+  
+  # 字符集
+  charset: utf8mb4
+  
+  # 连接池配置
+  pool_size: 10
+  max_overflow: 20
+  pool_timeout: 30
+
+# JWT 认证配置
+jwt:
+  # JWT 密钥（生产环境请务必修改为随机字符串）
+  # 生成方法: python -c "import secrets; print(secrets.token_hex(32))"
+  secret_key: "your-secret-key-change-in-production-please-use-random-string"
+  
+  # Token 过期时间（天）
+  expires_days: 7
+  
+  # Token 签发者
+  issuer: "dify-workflow-exporter"
+  
+  # Token 加密算法
+  algorithm: "HS256"
+
+# 用户系统配置
+user_system:
+  # 密码加密轮数（bcrypt rounds，值越大越安全但越慢，建议10-14）
+  password_hash_rounds: 12
+  
+  # 默认管理员配置
+  default_admin:
+    email: "admin@example.com"
+    username: "系统管理员"
+    password: "admin123456"  # ⚠️ 首次登录后请立即修改
+  
+  # 密码策略
+  password_policy:
+    min_length: 6
+    require_uppercase: false
+    require_lowercase: false
+    require_numbers: false
+    require_special_chars: false
+
+# 应用配置
+application:
+  # 应用名称
+  name: "Dify Workflow DSL 管理器"
+  
+  # 应用版本
+  version: "2.0.0"
+  
+  # Flask 配置
+  flask:
+    debug: false
+    host: "0.0.0.0"
+    port: 5001
+    
+  # CORS 配置
+  cors:
+    enabled: true
+    origins:
+      - "http://localhost:5173"
+      - "http://localhost:3000"
+    methods:
+      - "GET"
+      - "POST"
+      - "PUT"
+      - "DELETE"
+      - "OPTIONS"
+    allow_headers:
+      - "Content-Type"
+      - "Authorization"
+
+# 日志配置
+logging:
+  # 日志级别: DEBUG, INFO, WARNING, ERROR, CRITICAL
+  level: "INFO"
+  
+  # 日志格式
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  
+  # 日志文件
+  file:
+    enabled: true
+    path: "logs/app.log"
+    max_bytes: 10485760  # 10MB
+    backup_count: 5
+
+# 安全配置
+security:
+  # 允许的最大登录失败次数（暂未实现）
+  max_login_attempts: 5
+  
+  # 登录失败锁定时间（分钟）（暂未实现）
+  lockout_duration: 15
+  
+  # Session 超时时间（分钟）（暂未实现）
+  session_timeout: 30
+
+# ============================================
+# 环境变量配置（优先级高于配置文件）
+# ============================================
+# 
+# 数据库配置:
+# export CONFIG_DB_HOST=localhost
+# export CONFIG_DB_PORT=3306
+# export CONFIG_DB_DATABASE=dify_workflow_config
+# export CONFIG_DB_USERNAME=root
+# export CONFIG_DB_PASSWORD=your_password
+#
+# JWT 配置:
+# export JWT_SECRET_KEY=your-secret-key
+# export JWT_EXPIRES_DAYS=7
+#
+# 应用配置:
+# export FLASK_DEBUG=false
+# export FLASK_HOST=0.0.0.0
+# export FLASK_PORT=5001
+#
+# ============================================

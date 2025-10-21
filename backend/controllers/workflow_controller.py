@@ -2,10 +2,15 @@ from flask import request
 from flask_restful import Resource, reqparse
 from services.workflow_service import WorkflowService
 from services.app_dsl_service import AppDslService
+from services.user_config_service import user_config_service
+from middleware.auth_middleware import token_required
 import zipfile
 import io
 import json
 from datetime import datetime
+import logging
+
+logger = logging.getLogger(__name__)
 
 class WorkflowDraftApi(Resource):
     def get(self, app_id):
@@ -66,6 +71,26 @@ class WorkflowRefreshApi(Resource):
 class WorkflowListApi(Resource):
     def get(self):
         """获取所有工作流列表"""
+        # 打印所有请求头用于调试
+        logger.info(f"收到工作流列表请求，请求头: {dict(request.headers)}")
+        
+        # 尝试获取当前用户信息（如果有token的话）
+        user_id = None
+        token = request.headers.get('Authorization')
+        logger.info(f"Authorization header: {token[:50] if token else 'None'}...")
+        
+        if token:
+            if token.startswith('Bearer '):
+                token = token[7:]
+            from services.auth_service import auth_service
+            payload = auth_service.verify_token(token)
+            if payload:
+                user_id = payload.get('user_id')
+                logger.info(f"用户 {user_id} 请求工作流列表")
+        
+        if not user_id:
+            logger.warning("未认证用户请求工作流列表，使用系统配置")
+        
         # 解析分页参数
         parser = reqparse.RequestParser()
         parser.add_argument("page", type=int, default=1, location="args", help="页码")
@@ -78,7 +103,8 @@ class WorkflowListApi(Resource):
         page_size = max(5, min(100, args["page_size"]))  # 限制每页5-100条
         search = args["search"].strip() if args["search"] else ""
         
-        workflow_service = WorkflowService()
+        # 创建WorkflowService并传入用户配置
+        workflow_service = WorkflowService(user_id=user_id)
         
         try:
             # 获取分页工作流数据

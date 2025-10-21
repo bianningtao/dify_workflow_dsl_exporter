@@ -184,4 +184,100 @@ export interface BatchImportResponse {
   total_count: number;
   failed_count: number;
   warning_count: number;
+}
+
+// 配置管理相关类型定义
+export interface AuthConfig {
+  type: 'bearer' | 'basic' | 'api_key';
+  token?: string;
+  username?: string;
+  password?: string;
+  api_key?: string;
+  api_key_header?: string;
+}
+
+export interface ApiEndpoints {
+  apps_list: string;
+  app_detail: string;
+  app_export: string;
+  app_import: string;
+  workflow_draft: string;
+  workflow_detail: string;
+  environment_variables: string;
+  import_status: string;
+  import_confirm: string;
+  check_dependencies: string;
+}
+
+export interface ApiParams {
+  apps_list: {
+    name: string;
+    is_created_by_me: boolean;
+    page: number;
+    limit: number;
+  };
+  pagination: {
+    default_page_size: number;
+    max_page_size: number;
+    api_page_size: number;
+  };
+}
+
+export interface ApiConfig {
+  base_url: string;
+  auth: AuthConfig;
+  endpoints: ApiEndpoints;
+  params: ApiParams;
+  timeout: number;
+  retry_count: number;
+  retry_delay: number;
+}
+
+export interface DatabaseConfig {
+  type: string;
+  host: string;
+  port: number;
+  database: string;
+  username: string;
+  password: string;
+  pool_size: number;
+  max_overflow: number;
+  pool_timeout: number;
+  ssl_mode: string;
+  tables: {
+    apps: string;
+    workflows: string;
+    app_environment_variables: string;
+    workflow_nodes: string;
+    workflow_edges: string;
+  };
+}
+
+export interface TargetInstance {
+  id: string;
+  name: string;
+  url: string;
+  auth: AuthConfig;
+  is_default?: boolean;
+}
+
+export interface SystemConfig {
+  data_source: 'database' | 'api';
+  database?: DatabaseConfig;
+  api?: ApiConfig;
+  export?: {
+    default_format: string;
+  };
+  logging?: {
+    level: string;
+    file: string;
+    max_size: string;
+    backup_count: number;
+    format: string;
+  };
+  cache?: {
+    enabled: boolean;
+    ttl: number;
+  };
+  target_instances?: TargetInstance[];
 } 

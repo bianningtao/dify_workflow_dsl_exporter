@@ -4,13 +4,48 @@ import uuid
 import logging
 
 from .config_service import config
+from .user_config_service import user_config_service
 from .database_connector import database_connector
-from .api_connector import api_connector
+from .api_connector import APIConnector
 
 
 class WorkflowService:
     # 模拟数据库存储（仅作为fallback）
     _workflows: Dict[str, Workflow] = {}
+    
+    def __init__(self, user_id: Optional[str] = None):
+        """
+        初始化WorkflowService
+        :param user_id: 用户ID，如果提供则使用用户配置
+        """
+        self.user_id = user_id
+        self._user_api_connector = None
+        
+        if user_id:
+            # 加载用户配置并创建专用的APIConnector
+            user_config = user_config_service.get_full_user_config(user_id)
+            logging.info(f"加载用户 {user_id} 的配置: {user_config is not None}")
+            
+            if user_config:
+                logging.info(f"用户配置数据源: {user_config.get('data_source')}")
+                if user_config.get('data_source') == 'api':
+                    api_config = user_config.get('api', {})
+                    logging.info(f"用户 API 配置: base_url={api_config.get('base_url')}, auth_type={api_config.get('auth', {}).get('type')}")
+                    
+                    self._user_api_connector = APIConnector()
+                    # 使用用户配置初始化APIConnector
+                    self._user_api_connector._init_with_user_config(user_config)
+                    logging.info(f"用户 {user_id} 的 APIConnector 已创建")
+            else:
+                logging.warning(f"用户 {user_id} 没有配置数据")
+    
+    def _get_api_connector(self):
+        """获取API连接器（优先使用用户的，否则使用全局的）"""
+        if self._user_api_connector:
+            return self._user_api_connector
+        # Fallback to global connector
+        from .api_connector import api_connector
+        return api_connector
     
     def get_draft_workflow(self, app_id: str) -> Optional[Workflow]:
         """
@@ -21,8 +56,8 @@ class WorkflowService:
         # 根据配置选择数据源
         if config.is_database_enabled():
             return database_connector.get_workflow_by_app_id(app_id)
-        elif config.is_api_enabled():
-            return api_connector.get_workflow_by_app_id(app_id)
+        elif config.is_api_enabled() or self._user_api_connector:
+            return self._get_api_connector().get_workflow_by_app_id(app_id)
         else:
             # 使用内存存储作为fallback
             return self._workflows.get(app_id)
@@ -37,8 +72,8 @@ class WorkflowService:
         # 根据配置选择数据源
         if config.is_database_enabled():
             workflows = database_connector.get_all_workflows()
-        elif config.is_api_enabled():
-            workflows = api_connector.get_all_workflows()
+        elif config.is_api_enabled() or self._user_api_connector:
+            workflows = self._get_api_connector().get_all_workflows()
         else:
             # 使用内存存储作为fallback
             workflows = list(self._workflows.values())
@@ -62,8 +97,8 @@ class WorkflowService:
         app_model = None
         if config.is_database_enabled():
             app_model = database_connector.get_app_by_id(app_id)
-        elif config.is_api_enabled():
-            app_model = api_connector.get_app_by_id(app_id)
+        elif config.is_api_enabled() or self._user_api_connector:
+            app_model = self._get_api_connector().get_app_by_id(app_id)
         
         # 如果没有找到应用，创建一个默认的
         if app_model is None:
@@ -134,7 +169,7 @@ class WorkflowService:
                         "data": {
                             "type": "end",
                             "title": "结束",
-                            "outputs": {}
+                            "outputs": []
                         },
                         "position": {"x": 500, "y": 100}
                     }
@@ -220,8 +255,8 @@ class WorkflowService:
 
     def clear_cache(self):
         """清除缓存，强制刷新数据"""
-        if config.is_api_enabled():
-            api_connector.clear_cache()
+        if config.is_api_enabled() or self._user_api_connector:
+            self._get_api_connector().clear_cache()
             logging.info("工作流服务缓存已清除")
 
     def get_workflows_paginated(self, page: int = 1, page_size: int = 20, search: str = "") -> dict:
@@ -235,8 +270,8 @@ class WorkflowService:
         # 根据配置选择数据源
         if config.is_database_enabled():
             return database_connector.get_workflows_paginated(page, page_size, search)
-        elif config.is_api_enabled():
-            return api_connector.get_workflows_paginated(page, page_size, search)
+        elif config.is_api_enabled() or self._user_api_connector:
+            return self._get_api_connector().get_workflows_paginated(page, page_size, search)
         else:
             # 使用内存存储作为fallback
             workflows = list(self._workflows.values())

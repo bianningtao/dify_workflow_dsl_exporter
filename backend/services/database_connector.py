@@ -471,5 +471,22 @@ class DatabaseConnector:
             return {"workflows": [], "total": 0}
 
 
-# 全局数据库连接器实例
-database_connector = DatabaseConnector() 
+# 全局数据库连接器实例（延迟初始化）
+_database_connector_instance = None
+
+def get_database_connector():
+    """获取数据库连接器实例（单例模式，延迟初始化）"""
+    global _database_connector_instance
+    if _database_connector_instance is None:
+        _database_connector_instance = DatabaseConnector()
+    return _database_connector_instance
+
+# 为了向后兼容，保留database_connector作为属性访问
+class _DatabaseConnectorProxy:
+    def __getattr__(self, name):
+        return getattr(get_database_connector(), name)
+    
+    def __call__(self, *args, **kwargs):
+        return get_database_connector()(*args, **kwargs)
+
+database_connector = _DatabaseConnectorProxy() 

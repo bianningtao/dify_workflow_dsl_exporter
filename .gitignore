@@ -128,11 +128,19 @@ Thumbs.db
 build/
 dist/ 
 
-# Configuration files
+# Configuration files (旧版YAML配置，已废弃)
 config.yaml
 config.yml
 *.config.yaml
 *.config.yml
+
+# Database configuration files (数据库连接配置，包含敏感信息)
+backend/config_db.yaml
+config_db.yaml
+
+# Keep example files (保留示例文件)
+!backend/config_db.yaml.example
+!config_db.yaml.example
 
 # Database files
 *.db

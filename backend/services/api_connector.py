@@ -28,6 +28,18 @@ class APIConnector:
         self._access_token = None
         self._refresh_token = None
         self._token_expiry = None
+        # 用户配置（用于覆盖系统配置）
+        self._user_config = None
+        self._init_api_config()
+    
+    def _init_with_user_config(self, user_config: Dict[str, Any]):
+        """使用用户配置初始化APIConnector
+        
+        Args:
+            user_config: 用户配置字典，包含 data_source, api, database 等
+        """
+        self._user_config = user_config
+        # 重新初始化API配置
         self._init_api_config()
     
     def _is_cache_valid(self) -> bool:
@@ -232,7 +244,12 @@ class APIConnector:
     
     def _get_endpoint(self, endpoint_key: str, **kwargs) -> str:
         """从配置获取API端点并格式化参数"""
-        api_config = self.config.get_api_config()
+        # 如果有用户配置，使用用户配置；否则使用系统配置
+        if self._user_config:
+            api_config = self._user_config.get('api', {})
+        else:
+            api_config = self.config.get_api_config()
+        
         endpoints = api_config.get('endpoints', {})
         
         endpoint_template = endpoints.get(endpoint_key)
@@ -247,7 +264,12 @@ class APIConnector:
     
     def _get_api_params(self, param_key: str) -> dict:
         """从配置获取API查询参数"""
-        api_config = self.config.get_api_config()
+        # 如果有用户配置，使用用户配置；否则使用系统配置
+        if self._user_config:
+            api_config = self._user_config.get('api', {})
+        else:
+            api_config = self.config.get_api_config()
+        
         params = api_config.get('params', {})
         return params.get(param_key, {})
     
@@ -281,39 +303,77 @@ class APIConnector:
     
     def _init_api_config(self):
         """初始化API配置"""
-        if not self.config.is_api_enabled():
-            # 在database模式下，设置默认值以避免属性错误
-            self.base_url = None
-            self.headers = {}
-            self.timeout = 30
-            return
-        
-        api_config = self.config.get_api_config()
-        self.base_url = api_config['base_url'].rstrip('/')
-        
-        # 获取认证配置
-        auth_config = api_config.get('auth', {})
-        
-        # 如果是basic认证，尝试登录获取token
-        if auth_config.get('type') == 'basic':
-            if self._login_with_credentials():
-                # 使用获取的access_token
-                self.headers = {"Authorization": f"Bearer {self._access_token}"}
-                logging.info("使用自动登录获得的访问令牌")
-            else:
-                logging.error("自动登录失败，无法获取访问令牌")
+        # 如果有用户配置，使用用户配置；否则使用系统配置
+        if self._user_config:
+            # 使用用户配置
+            if self._user_config.get('data_source') != 'api':
+                self.base_url = None
+                self.headers = {}
+                self.timeout = 30
                 return
-        else:
-            # 使用配置的认证头
-            self.headers = self.config.get_api_headers()
-        
-            # 设置会话头部
+            
+            api_config = self._user_config.get('api', {})
+            self.base_url = api_config.get('base_url', '').rstrip('/')
+            
+            # 获取认证配置
+            auth_config = api_config.get('auth', {})
+            auth_type = auth_config.get('type', 'bearer')
+            
+            # 构建认证头
+            if auth_type == 'bearer':
+                token = auth_config.get('token', '')
+                self.headers = {"Authorization": f"Bearer {token}"} if token else {}
+            elif auth_type == 'basic':
+                # 暂不支持用户配置的basic认证自动登录
+                username = auth_config.get('username', '')
+                password = auth_config.get('password', '')
+                if username and password:
+                    import base64
+                    credentials = base64.b64encode(f"{username}:{password}".encode()).decode()
+                    self.headers = {"Authorization": f"Basic {credentials}"}
+            elif auth_type == 'api_key':
+                api_key = auth_config.get('api_key', '')
+                header_name = auth_config.get('api_key_header', 'X-API-Key')
+                self.headers = {header_name: api_key} if api_key else {}
+            
             self.session.headers.update(self.headers)
-            
-            # 设置超时
             self.timeout = api_config.get('timeout', 30)
+            logging.info(f"API连接器使用用户配置初始化，基础URL: {self.base_url}")
+        else:
+            # 使用系统配置
+            if not self.config.is_api_enabled():
+                # 在database模式下，设置默认值以避免属性错误
+                self.base_url = None
+                self.headers = {}
+                self.timeout = 30
+                return
             
-            logging.info(f"API连接器初始化成功，基础URL: {self.base_url}")
+            api_config = self.config.get_api_config()
+            self.base_url = api_config['base_url'].rstrip('/')
+            
+            # 获取认证配置
+            auth_config = api_config.get('auth', {})
+            
+            # 如果是basic认证，尝试登录获取token
+            if auth_config.get('type') == 'basic':
+                if self._login_with_credentials():
+                    # 使用获取的access_token
+                    self.headers = {"Authorization": f"Bearer {self._access_token}"}
+                    logging.info("使用自动登录获得的访问令牌")
+                else:
+                    logging.error("自动登录失败，无法获取访问令牌")
+                    return
+            else:
+                # 使用配置的认证头
+                self.headers = self.config.get_api_headers()
+            
+                # 设置会话头部
+                self.session.headers.update(self.headers)
+                
+                # 设置超时
+                self.timeout = api_config.get('timeout', 30)
+                
+                logging.info(f"API连接器初始化成功，基础URL: {self.base_url}")
     
     def _make_request(self, method: str, endpoint: str, **kwargs) -> Optional[Dict[str, Any]]:
         """发送HTTP请求"""
@@ -662,5 +722,22 @@ class APIConnector:
             logging.info("API连接器已关闭")
 
 
-# 全局API连接器实例
-api_connector = APIConnector() 
+# 全局API连接器实例（延迟初始化）
+_api_connector_instance = None
+
+def get_api_connector():
+    """获取API连接器实例（单例模式，延迟初始化）"""
+    global _api_connector_instance
+    if _api_connector_instance is None:
+        _api_connector_instance = APIConnector()
+    return _api_connector_instance
+
+# 为了向后兼容，保留api_connector作为属性访问
+class _APIConnectorProxy:
+    def __getattr__(self, name):
+        return getattr(get_api_connector(), name)
+    
+    def __call__(self, *args, **kwargs):
+        return get_api_connector()(*args, **kwargs)
+
+api_connector = _APIConnectorProxy() 

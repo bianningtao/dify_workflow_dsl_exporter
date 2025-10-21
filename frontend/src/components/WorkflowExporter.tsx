@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 import { useWorkflowExport } from '../hooks/useWorkflowExport';
 import { useBatchWorkflowExport } from '../hooks/useBatchWorkflowExport';
 import { Workflow, WorkflowSummary, WorkflowImportResponse, BatchImportResponse } from '../types';
@@ -10,8 +12,13 @@ import SuccessModal from './SuccessModal';
 import AppTypeTag from './AppTypeTag';
 import AppTypeStats from './AppTypeStats';
 import Pagination from './Pagination';
+import SettingsModal from './SettingsModal';
+import ConfirmModal from './ConfirmModal';
+import api from '../services/api';
 
 const WorkflowExporter: React.FC = () => {
+  const navigate = useNavigate();
+  const { user, logout, isAdmin } = useAuth();
   // 主菜单模式：export 或 import
   const [mainMode, setMainMode] = useState<'export' | 'import'>('export');
   // 子菜单模式：batch 或 single
@@ -21,6 +28,15 @@ const WorkflowExporter: React.FC = () => {
   const [showSingleModal, setShowSingleModal] = useState(false);
   const [showBatchModal, setShowBatchModal] = useState(false);
   const [showBatchImportModal, setShowBatchImportModal] = useState(false);
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
+  
+  // 确认弹窗状态
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [confirmModalConfig, setConfirmModalConfig] = useState({
+    title: '',
+    message: '',
+    type: 'warning' as 'warning' | 'error' | 'info' | 'success',
+  });
   
   // 成功弹窗状态
   const [showSuccessModal, setShowSuccessModal] = useState(false);
@@ -67,11 +83,100 @@ const WorkflowExporter: React.FC = () => {
 
   // 搜索输入状态
   const [searchInput, setSearchInput] = useState('');
+  
+  // 配置检查状态
+  const [configChecked, setConfigChecked] = useState(false);
+  const [isConfigValid, setIsConfigValid] = useState(false);
+  const [configError, setConfigError] = useState<string | null>(null);
 
-  // 初始加载所有工作流
+  // 首次加载时检查配置
   useEffect(() => {
-    getAllWorkflows();
-  }, [getAllWorkflows]);
+    checkConfig();
+  }, []);
+
+  // 配置有效后才加载工作流
+  useEffect(() => {
+    if (configChecked && isConfigValid) {
+      getAllWorkflows().catch((error) => {
+        // API请求失败，提示用户检查配置
+        setConfigError('无法连接到Dify服务，请检查配置是否正确');
+        setShowSettingsModal(true);
+      });
+    }
+  }, [configChecked, isConfigValid, getAllWorkflows]);
+
+  // 检查配置是否完整
+  const checkConfig = async () => {
+    try {
+      const response = await api.get('/config');
+      const data = response.data;
+      
+      if (data.success && data.data) {
+        const config = data.data;
+        
+        // 检查是否配置了认证信息
+        if (config.data_source === 'api') {
+          const apiConfig = config.api;
+          const authConfig = apiConfig?.auth;
+          
+          // 检查base_url是否配置
+          if (!apiConfig?.base_url || apiConfig.base_url.trim() === '') {
+            setConfigError('请配置API基础URL');
+            setShowSettingsModal(true);
+            setIsConfigValid(false);
+            return;
+          }
+          
+          let hasAuth = false;
+          
+          if (authConfig?.type === 'bearer' && authConfig.token) {
+            hasAuth = true;
+          } else if (authConfig?.type === 'basic' && authConfig.username && authConfig.password) {
+            hasAuth = true;
+          } else if (authConfig?.type === 'api_key' && authConfig.api_key) {
+            hasAuth = true;
+          }
+          
+          if (!hasAuth) {
+            // 没有配置认证信息，打开设置面板
+            setConfigError('请配置认证信息（Token、用户名密码或API Key）');
+            setShowSettingsModal(true);
+            setIsConfigValid(false);
+          } else {
+            setConfigError(null);
+            setIsConfigValid(true);
+          }
+        } else if (config.data_source === 'database') {
+          // 检查数据库配置
+          const dbConfig = config.database;
+          if (!dbConfig?.host || !dbConfig?.database || !dbConfig?.username) {
+            setConfigError('请完整配置数据库连接信息');
+            setShowSettingsModal(true);
+            setIsConfigValid(false);
+          } else {
+            setConfigError(null);
+            setIsConfigValid(true);
+          }
+        } else {
+          setConfigError('请选择数据源类型');
+          setIsConfigValid(false);
+          setShowSettingsModal(true);
+        }
+      } else {
+        setConfigError('无法读取配置文件，请检查系统配置');
+        setShowSettingsModal(true);
+        setIsConfigValid(false);
+      }
+    } catch (error) {
+      console.error('检查配置失败:', error);
+      // 检查失败也打开设置面板
+      setConfigError('无法连接到后端服务，请确保服务已启动');
+      setShowSettingsModal(true);
+      setIsConfigValid(false);
+    } finally {
+      setConfigChecked(true);
+    }
+  };
 
   // 单个工作流相关处理
   const handleGetWorkflow = async () => {
@@ -128,6 +233,27 @@ const WorkflowExporter: React.FC = () => {
     handleSearch('');
   };
 
+  // 显示确认弹窗的辅助函数
+  const showConfigIncompleteWarning = () => {
+    // console.log('🚨 显示配置不完整警告');
+    setConfirmModalConfig({
+      title: '配置不完整',
+      message: '请完整配置 API 基础URL 和认证信息后才能关闭设置。\n\n如果不配置，系统将无法获取工作流数据。',
+      type: 'warning',
+    });
+    setShowConfirmModal(true);
+    // console.log('✅ 弹窗状态已设置为 true');
+  };
+
+  const showConfigErrorWarning = (message: string) => {
+    setConfirmModalConfig({
+      title: '无法获取配置',
+      message: message || '请完成配置后再关闭设置。',
+      type: 'error',
+    });
+    setShowConfirmModal(true);
+  };
+
   const selectedWorkflowsData = workflows.filter(w => selectedWorkflows.has(w.app_id));
   const hasSecretVariables = selectedWorkflowsData.some(w => w.has_secret_variables);
 
@@ -159,9 +285,235 @@ const WorkflowExporter: React.FC = () => {
     setShowSuccessModal(true);
   };
 
+  // 如果配置未检查完成，显示加载状态
+  if (!configChecked) {
+    return (
+      <div className="max-w-7xl mx-auto p-6">
+        <div className="flex items-center justify-center h-screen">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-500 mx-auto mb-4"></div>
+            <p className="text-gray-600 text-lg">正在检查系统配置...</p>
+            {configError && (
+              <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg text-yellow-800 max-w-md mx-auto">
+                <p className="font-medium">⚠️ 配置提示</p>
+                <p className="text-sm mt-1">{configError}</p>
+              </div>
+            )}
+          </div>
+        </div>
+        
+        {/* 设置弹窗 */}
+        <SettingsModal
+          isOpen={showSettingsModal}
+          onClose={async () => {
+            // 先检查配置是否有效
+            try {
+              const response = await api.get('/config');
+              const data = response.data;
+              
+              if (data.success && data.data) {
+                const config = data.data;
+                let configValid = false;
+                
+                // 检查配置是否完整
+                if (config.data_source === 'api') {
+                  const apiConfig = config.api;
+                  const authConfig = apiConfig?.auth;
+                  const hasBaseUrl = apiConfig?.base_url && apiConfig.base_url.trim() !== '';
+                  const hasAuth = 
+                    (authConfig?.type === 'bearer' && authConfig.token) ||
+                    (authConfig?.type === 'basic' && authConfig.username && authConfig.password) ||
+                    (authConfig?.type === 'api_key' && authConfig.api_key);
+                  
+                  configValid = hasBaseUrl && hasAuth;
+                }
+                
+                if (configValid) {
+                  // 配置有效，允许关闭
+                  setShowSettingsModal(false);
+                  setConfigError(null);
+                  checkConfig();
+                } else {
+                  // 配置无效，显示提示但不关闭弹窗
+                  showConfigIncompleteWarning();
+                }
+              } else {
+                // 无法获取配置，也不允许关闭
+                showConfigErrorWarning('请完成配置后再关闭设置。');
+              }
+            } catch (error) {
+              console.error('检查配置失败:', error);
+              showConfigErrorWarning('检查配置失败，请完成配置后再关闭设置。');
+            }
+          }}
+        />
+        
+        {/* 确认弹窗 */}
+        <ConfirmModal
+          isOpen={showConfirmModal}
+          title={confirmModalConfig.title}
+          message={confirmModalConfig.message}
+          type={confirmModalConfig.type}
+          confirmText="确定"
+          onConfirm={() => setShowConfirmModal(false)}
+        />
+      </div>
+    );
+  }
+
+  // 如果配置无效，显示配置提示
+  if (!isConfigValid) {
+    return (
+      <div className="max-w-7xl mx-auto p-6">
+        <div className="flex items-center justify-center h-screen">
+          <div className="text-center max-w-md">
+            <div className="mb-6">
+              <svg className="w-20 h-20 mx-auto text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+            </div>
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">需要配置系统</h2>
+            {configError && (
+              <p className="text-gray-600 mb-6">{configError}</p>
+            )}
+            <button
+              onClick={() => setShowSettingsModal(true)}
+              className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors inline-flex items-center"
+            >
+              <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+              打开系统设置
+            </button>
+          </div>
+        </div>
+        
+        {/* 设置弹窗 */}
+        <SettingsModal
+          isOpen={showSettingsModal}
+          onClose={async () => {
+            // 先检查配置是否有效
+            try {
+              const response = await api.get('/config');
+              const data = response.data;
+              
+              if (data.success && data.data) {
+                const config = data.data;
+                let configValid = false;
+                
+                // 检查配置是否完整
+                if (config.data_source === 'api') {
+                  const apiConfig = config.api;
+                  const authConfig = apiConfig?.auth;
+                  const hasBaseUrl = apiConfig?.base_url && apiConfig.base_url.trim() !== '';
+                  const hasAuth = 
+                    (authConfig?.type === 'bearer' && authConfig.token) ||
+                    (authConfig?.type === 'basic' && authConfig.username && authConfig.password) ||
+                    (authConfig?.type === 'api_key' && authConfig.api_key);
+                  
+                  configValid = hasBaseUrl && hasAuth;
+                }
+                
+                if (configValid) {
+                  // 配置有效，允许关闭
+                  setShowSettingsModal(false);
+                  setConfigError(null);
+                  checkConfig();
+                } else {
+                  // 配置无效，显示提示但不关闭弹窗
+                  showConfigIncompleteWarning();
+                }
+              } else {
+                // 无法获取配置，也不允许关闭
+                showConfigErrorWarning('请完成配置后再关闭设置。');
+              }
+            } catch (error) {
+              console.error('检查配置失败:', error);
+              showConfigErrorWarning('检查配置失败，请完成配置后再关闭设置。');
+            }
+          }}
+        />
+        
+        {/* 确认弹窗 */}
+        <ConfirmModal
+          isOpen={showConfirmModal}
+          title={confirmModalConfig.title}
+          message={confirmModalConfig.message}
+          type={confirmModalConfig.type}
+          confirmText="确定"
+          onConfirm={() => setShowConfirmModal(false)}
+        />
+      </div>
+    );
+  }
+
+  const handleLogout = async () => {
+    await logout();
+    navigate('/login');
+  };
+
   return (
     <div className="max-w-7xl mx-auto p-6">
-      <h1 className="text-3xl font-bold mb-8 text-center">工作流 DSL 管理器</h1>
+      {/* 顶部用户信息栏 */}
+      <div className="bg-white rounded-lg shadow-sm p-4 mb-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-3">
+            <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center">
+              <span className="text-white font-semibold text-lg">
+                {user?.username?.charAt(0).toUpperCase() || 'U'}
+              </span>
+            </div>
+            <div>
+              <div className="text-sm text-gray-500">当前用户</div>
+              <div className="font-medium text-gray-900">{user?.username || '未知用户'}</div>
+            </div>
+          </div>
+          
+          <div className="flex items-center space-x-2">
+            {isAdmin && (
+              <button
+                onClick={() => navigate('/admin')}
+                className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors flex items-center space-x-2"
+                title="管理员面板"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+                </svg>
+                <span>管理员</span>
+              </button>
+            )}
+            <button
+              onClick={handleLogout}
+              className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors flex items-center space-x-2"
+              title="退出登录"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+              </svg>
+              <span>退出</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* 标题和设置按钮 */}
+      <div className="flex items-center justify-between mb-8">
+        <div className="flex-1"></div>
+        <h1 className="text-3xl font-bold text-center flex-1">工作流 DSL 管理器</h1>
+        <div className="flex-1 flex justify-end">
+          <button
+            onClick={() => setShowSettingsModal(true)}
+            className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+            title="系统设置"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+          </button>
+        </div>
+      </div>
       
       {/* 主菜单 */}
       <div className="bg-white rounded-lg shadow-md p-6 mb-6">
@@ -661,6 +1013,70 @@ const WorkflowExporter: React.FC = () => {
         message={successData?.message || ''}
         appId={successData?.appId}
         statistics={successData?.statistics}
+      />
+
+      {/* 确认弹窗 */}
+      <ConfirmModal
+        isOpen={showConfirmModal}
+        title={confirmModalConfig.title}
+        message={confirmModalConfig.message}
+        type={confirmModalConfig.type}
+        confirmText="确定"
+        onConfirm={() => setShowConfirmModal(false)}
+      />
+
+      {/* 设置弹窗 */}
+      <SettingsModal
+        isOpen={showSettingsModal}
+        onClose={async () => {
+          // 先检查配置是否有效
+          try {
+            const response = await api.get('/config');
+            const data = response.data;
+            
+            if (data.success && data.data) {
+              const config = data.data;
+              let configValid = false;
+              
+              // 检查配置是否完整
+              if (config.data_source === 'api') {
+                const apiConfig = config.api;
+                const authConfig = apiConfig?.auth;
+                const hasBaseUrl = apiConfig?.base_url && apiConfig.base_url.trim() !== '';
+                const hasAuth = 
+                  (authConfig?.type === 'bearer' && authConfig.token) ||
+                  (authConfig?.type === 'basic' && authConfig.username && authConfig.password) ||
+                  (authConfig?.type === 'api_key' && authConfig.api_key);
+                
+                configValid = hasBaseUrl && hasAuth;
+              }
+              
+              if (configValid) {
+                // 配置有效，允许关闭
+                setShowSettingsModal(false);
+                setConfigError(null);
+                checkConfig();
+              } else {
+                // 配置无效，显示提示但不关闭弹窗
+                showConfigIncompleteWarning();
+              }
+            } else {
+              // 无法获取配置，也不允许关闭
+              showConfigErrorWarning('无法获取配置，请完成配置后再关闭设置。');
+            }
+          } catch (error) {
+            // console.error('检查配置失败:', error);
+            showConfigErrorWarning('检查配置失败，请完成配置后再关闭设置。');
+          }
+        }}
+        onSaveSuccess={async () => {
+          // 保存成功后刷新配置和工作流列表
+          // console.log('配置保存成功，刷新数据...');
+          await checkConfig();
+          if (isConfigValid) {
+            await refreshWorkflows();
+          }
+        }}
       />
     </div>
   );
