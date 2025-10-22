@@ -154,5 +154,11 @@ workflows-export-*.zip
 # Docker deployment files (本地部署文件，包含敏感配置)
 docker/
 !docker/.gitkeep
-!docker/README.md 
-md/
+!docker/README.md
+
+# Process files directory (过程文件目录 - 仅本地存储)
+# 用于存储开发过程中的临时文档、笔记、调试信息等
+# 这些文件不应上传到远程仓库
+process/
+!process/.gitkeep
+!process/README.md
