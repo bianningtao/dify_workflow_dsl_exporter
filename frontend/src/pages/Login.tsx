@@ -66,7 +66,7 @@ export default function Login() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="appearance-none relative block w-full px-4 py-3 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200"
-                placeholder="admin@example.com"
+                placeholder="请输入邮箱地址"
               />
             </div>
 
@@ -116,9 +116,9 @@ export default function Login() {
 
           {/* 提示信息 */}
           <div className="text-center text-sm text-gray-600">
-            <p>默认管理员账号: admin@example.com</p>
-            <p>默认密码: admin123456</p>
-            <p className="mt-2 text-red-500">⚠️ 首次登录后请立即修改密码</p>
+            {/* <p>默认管理员账号: admin@example.com</p>
+            <p>默认密码: admin123456</p> */}
+            <p className="mt-2 text-red-500">⚠️ 本站不会存储您的工作流或者其他信息</p>
           </div>
         </form>
       </div>

@@ -1,82 +1,80 @@
+# ============================================
 # 多阶段构建 Dockerfile
-# 第一阶段：构建前端
-FROM node:18-alpine AS frontend-builder
+# 阶段1: 构建前端
+# 阶段2: 构建最终镜像（包含前端构建产物和后端）
+# ============================================
+
+# ==================== 阶段 1: 构建前端 ====================
+FROM node:20-alpine AS frontend-builder
 
 WORKDIR /app/frontend
 
 # 复制前端依赖文件
 COPY frontend/package*.json ./
 
-# 安装前端依赖（包含开发依赖，因为构建需要）
+# 安装依赖（包括开发依赖，因为构建需要）
 RUN npm ci
 
 # 复制前端源代码
 COPY frontend/ ./
 
-# 构建前端
+# 构建前端（生成静态文件到 dist 目录）
 RUN npm run build
 
-# 第二阶段：构建后端
-FROM python:3.11-slim AS backend-builder
+# ==================== 阶段 2: 最终镜像 ====================
+FROM python:3.11-slim-bookworm
 
-WORKDIR /app/backend
+# 设置工作目录
+WORKDIR /app
+
+# 更换为阿里云镜像源以提高下载速度和稳定性
+RUN sed -i 's/deb.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list.d/debian.sources || \
+    (echo "deb https://mirrors.aliyun.com/debian/ bookworm main contrib non-free non-free-firmware" > /etc/apt/sources.list && \
+     echo "deb https://mirrors.aliyun.com/debian/ bookworm-updates main contrib non-free non-free-firmware" >> /etc/apt/sources.list && \
+     echo "deb https://mirrors.aliyun.com/debian-security/ bookworm-security main contrib non-free non-free-firmware" >> /etc/apt/sources.list)
 
 # 安装系统依赖
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
     gcc \
-    libpq-dev \
+    default-libmysqlclient-dev \
+    default-mysql-client \
+    pkg-config \
+    nginx \
+    curl \
+    && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
 # 复制后端依赖文件
-COPY backend/requirements.txt ./
+COPY backend/requirements.txt ./backend/
 
-# 安装Python依赖（使用国内镜像源）
-RUN pip install --no-cache-dir -i https://pypi.tuna.tsinghua.edu.cn/simple/ --trusted-host pypi.tuna.tsinghua.edu.cn -r requirements.txt
+# 安装 Python 依赖
+RUN pip install --no-cache-dir -r backend/requirements.txt && \
+    pip install --no-cache-dir gunicorn
 
-# 复制后端源代码
-COPY backend/ ./
+# 复制后端代码
+COPY backend/ ./backend/
 
-# 第三阶段：最终镜像
-FROM python:3.11-slim
+# 从前端构建阶段复制构建产物
+COPY --from=frontend-builder /app/frontend/dist ./frontend/dist
 
-# 设置环境变量
-ENV PYTHONPATH=/app/backend
-ENV FLASK_APP=app.py
-ENV FLASK_ENV=production
+# 复制 nginx 配置
+COPY docker/nginx.conf /etc/nginx/sites-available/default
 
-# 安装运行时依赖
-RUN apt-get update && apt-get install -y \
-    libpq5 \
-    nginx \
-    curl \
-    && rm -rf /var/lib/apt/lists/* \
-    && apt-get clean \
-    && pip install --upgrade pip
-
-# 创建应用目录
-WORKDIR /app
-
-# 从构建阶段复制文件
-COPY --from=frontend-builder /app/frontend/dist /app/frontend/dist
-COPY --from=backend-builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
-COPY --from=backend-builder /app/backend /app/backend
-
-# 创建必要的目录
-RUN mkdir -p /app/logs /app/data
-
-# 复制nginx配置
-COPY docker/nginx.conf /etc/nginx/nginx.conf
+# 创建日志目录
+RUN mkdir -p /app/logs /app/backend/logs
 
 # 复制启动脚本
-COPY docker/start.sh /app/start.sh
-RUN chmod +x /app/start.sh
+COPY docker/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
 
-# 暴露端口
-EXPOSE 80 5000
+# 暴露端口（nginx 前端端口）
+EXPOSE 80
 
-# 设置版本标签
-LABEL version="v0.1.0"
-LABEL description="Workflow DSL Exporter"
+# 健康检查
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+    CMD curl -f http://localhost/api/health || exit 1
 
-# 启动应用
-CMD ["/app/start.sh"] 
+# 启动脚本
+ENTRYPOINT ["/entrypoint.sh"]
+

@@ -140,9 +140,10 @@ def create_app():
     
     return app
 
+# 创建app实例供gunicorn使用
+app = create_app()
+
 if __name__ == "__main__":
-    app = create_app()
-    
     # 从配置文件加载 Flask 服务器配置
     flask_config = get_flask_config()
     

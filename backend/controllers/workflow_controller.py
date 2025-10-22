@@ -181,7 +181,27 @@ class WorkflowBatchExportApi(Resource):
         
         args = parser.parse_args()
         
-        workflow_service = WorkflowService()
+        # 获取当前用户信息（如果有token的话）
+        user_id = None
+        token = request.headers.get('Authorization')
+        logger.info(f"批量导出请求，Authorization header: {token[:50] if token else 'None'}...")
+        
+        if token:
+            if token.startswith('Bearer '):
+                token = token[7:]
+            from services.auth_service import auth_service
+            payload = auth_service.verify_token(token)
+            if payload:
+                user_id = payload.get('user_id')
+                logger.info(f"用户认证成功: user_id={user_id}")
+            else:
+                logger.warning("Token验证失败")
+        else:
+            logger.warning("未提供Authorization token")
+        
+        # 使用用户配置创建WorkflowService
+        logger.info(f"创建WorkflowService，user_id={user_id}")
+        workflow_service = WorkflowService(user_id=user_id)
         
         try:
             export_results = []
@@ -189,10 +209,17 @@ class WorkflowBatchExportApi(Resource):
             # 为每个应用ID导出DSL
             for app_id in args["app_ids"]:
                 try:
-                    # 获取工作流
+                    # 获取工作流 - 如果获取失败则跳过该应用
                     workflow = workflow_service.get_draft_workflow(app_id)
                     if not workflow:
-                        workflow = workflow_service.create_default_workflow(app_id)
+                        logger.warning(f"无法获取工作流 {app_id}，跳过导出")
+                        export_results.append({
+                            "app_id": app_id,
+                            "success": False,
+                            "error": "无法获取工作流信息",
+                            "workflow_name": f"应用 {app_id[:8]}"
+                        })
+                        continue
                     
                     # 获取或创建应用模型
                     app_model = workflow_service.get_or_create_app_model(app_id)

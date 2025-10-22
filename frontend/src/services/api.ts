@@ -67,33 +67,17 @@ export default axiosInstance;
 
 export class ApiService {
   static async exportAppConfig(appId: string, includeSecret: boolean = false): Promise<{ data: string }> {
-    const response = await fetch(`${API_BASE_URL}/apps/${appId}/export?include_secret=${includeSecret}`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+    // 使用 axiosInstance 以自动添加 Authorization token
+    const response = await axiosInstance.get(`/apps/${appId}/export`, {
+      params: { include_secret: includeSecret }
     });
-    
-    if (!response.ok) {
-      throw new Error(`Export failed: ${response.statusText}`);
-    }
-    
-    return response.json();
+    return response.data;
   }
   
   static async getWorkflowDraft(appId: string): Promise<Workflow> {
-    const response = await fetch(`${API_BASE_URL}/apps/${appId}/workflows/draft`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
-    
-    if (!response.ok) {
-      throw new Error(`Get workflow draft failed: ${response.statusText}`);
-    }
-    
-    return response.json();
+    // 使用 axiosInstance 以自动添加 Authorization token
+    const response = await axiosInstance.get<Workflow>(`/apps/${appId}/workflows/draft`);
+    return response.data;
   }
   
   static async getAllWorkflows(params: WorkflowListParams = {}): Promise<WorkflowListResponse> {
@@ -114,34 +98,15 @@ export class ApiService {
   }
   
   static async batchExportWorkflows(request: BatchExportRequest): Promise<BatchExportResponse> {
-    const response = await fetch(`${API_BASE_URL}/workflows/batch-export`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(request),
-    });
-    
-    if (!response.ok) {
-      throw new Error(`Batch export failed: ${response.statusText}`);
-    }
-    
-    return response.json();
+    // 使用 axiosInstance 以自动添加 Authorization token
+    const response = await axiosInstance.post<BatchExportResponse>('/workflows/batch-export', request);
+    return response.data;
   }
   
   static async refreshWorkflows(): Promise<{ success: boolean; message: string }> {
-    const response = await fetch(`${API_BASE_URL}/workflows/refresh`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
-    
-    if (!response.ok) {
-      throw new Error(`Refresh failed: ${response.statusText}`);
-    }
-    
-    return response.json();
+    // 使用 axiosInstance 以自动添加 Authorization token
+    const response = await axiosInstance.post<{ success: boolean; message: string }>('/workflows/refresh');
+    return response.data;
   }
 
   // 工作流导入相关API
@@ -173,20 +138,12 @@ export class ApiService {
   }
 
   static async validateWorkflowFile(yamlContent: string): Promise<{ valid: boolean; error?: string; app_info?: any }> {
-    const response = await fetch(`${API_BASE_URL}/workflows/validate`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ yaml_content: yamlContent }),
-    });
-    
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.error || `Validation failed: ${response.statusText}`);
-    }
-    
-    return response.json();
+    // 使用 axiosInstance 以自动添加 Authorization token
+    const response = await axiosInstance.post<{ valid: boolean; error?: string; app_info?: any }>(
+      '/workflows/validate',
+      { yaml_content: yamlContent }
+    );
+    return response.data;
   }
 
   // 配置管理相关API

@@ -1,3 +1,11 @@
+'''
+Author: bianningtao ab2961513324@163.com
+Date: 2025-10-22 11:28:35
+LastEditors: bianningtao ab2961513324@163.com
+LastEditTime: 2025-10-22 11:29:06
+FilePath: /dify_workflow_dsl_exporter/backend/services/app_dsl_service.py
+Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
+'''
 import yaml
 from typing import Dict, Any
 from models.app import App, AppMode, Workflow
@@ -55,8 +63,27 @@ class AppDslService:
         
         workflow_dict = workflow.to_dict(include_secret=include_secret)
         
+        # 处理节点兼容性
+        graph = workflow_dict.get("graph", {})
+        nodes = graph.get("nodes", [])
+        
+        # 如果是advanced-chat模式，需要将end节点转换为answer节点
+        if app_model.mode == "advanced-chat":
+            for node in nodes:
+                if node.get("type") == "end":
+                    # 转换为answer节点
+                    node["type"] = "answer"
+                    if "data" in node:
+                        node["data"]["type"] = "answer"
+                        # answer节点需要answer字段指定输出内容
+                        if "answer" not in node["data"]:
+                            # 默认使用LLM的输出
+                            node["data"]["answer"] = "{{#llm.text#}}"
+                        # 移除outputs字段（answer节点不需要）
+                        node["data"].pop("outputs", None)
+        
         # 处理知识检索节点的数据集ID加密（简化版）
-        for node in workflow_dict.get("graph", {}).get("nodes", []):
+        for node in nodes:
             if node.get("data", {}).get("type", "") == "knowledge-retrieval":
                 dataset_ids = node["data"].get("dataset_ids", [])
                 # 这里可以添加数据集ID加密逻辑

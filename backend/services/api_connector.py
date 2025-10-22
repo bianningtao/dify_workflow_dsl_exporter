@@ -322,6 +322,7 @@ class APIConnector:
             # 构建认证头
             if auth_type == 'bearer':
                 token = auth_config.get('token', '')
+                logging.info(f"使用用户配置的Bearer Token: {token[:50] if token else 'empty'}...")
                 self.headers = {"Authorization": f"Bearer {token}"} if token else {}
             elif auth_type == 'basic':
                 # 暂不支持用户配置的basic认证自动登录
@@ -414,7 +415,11 @@ class APIConnector:
     
     def get_app_by_id(self, app_id: str) -> Optional[App]:
         """根据应用ID获取应用信息"""
-        if not self.config.is_api_enabled():
+        # 如果有用户配置，检查用户配置；否则检查系统配置
+        if self._user_config:
+            if self._user_config.get('data_source') != 'api':
+                return None
+        elif not self.config.is_api_enabled():
             return None
         
         try:
@@ -444,7 +449,11 @@ class APIConnector:
     
     def get_workflow_by_app_id(self, app_id: str) -> Optional[Workflow]:
         """根据应用ID获取工作流信息"""
-        if not self.config.is_api_enabled():
+        # 如果有用户配置，检查用户配置；否则检查系统配置
+        if self._user_config:
+            if self._user_config.get('data_source') != 'api':
+                return None
+        elif not self.config.is_api_enabled():
             return None
         
         try:
@@ -464,11 +473,24 @@ class APIConnector:
             # 根据实际API响应格式调整
             workflow_data = response.get('data', response)
             
+            # 调试：打印graph结构
+            graph_data = workflow_data.get('graph', {})
+            logging.info(f"获取到工作流数据: id={workflow_data.get('id')}, app_id={workflow_data.get('app_id')}, graph存在={bool(graph_data)}")
+            if graph_data:
+                nodes = graph_data.get('nodes', [])
+                logging.info(f"Graph节点数量: {len(nodes)}")
+                for i, node in enumerate(nodes):
+                    logging.info(f"  节点{i}: id={node.get('id')}, type={node.get('type')}, data.type={node.get('data', {}).get('type')}")
+                edges = graph_data.get('edges', [])
+                logging.info(f"Graph边数量: {len(edges)}")
+            
             # 获取应用信息以获取应用名称
             app_info = self.get_app_by_id(app_id)
             app_name = app_info.name if app_info else f"工作流 {app_id[:8]}"
             app_description = app_info.description if app_info else ""
             app_mode = app_info.mode if app_info else "workflow"
+            
+            logging.info(f"应用信息: name={app_name}, mode={app_mode}")
             
             # 获取环境变量
             environment_variables = self.get_environment_variables_by_app_id(app_id)
@@ -486,11 +508,17 @@ class APIConnector:
             )
         except Exception as e:
             logging.error(f"获取工作流信息失败: {e}")
+            import traceback
+            logging.error(traceback.format_exc())
             return None
     
     def get_all_workflows(self) -> List[Workflow]:
         """获取所有工作流（使用缓存优化）"""
-        if not self.config.is_api_enabled():
+        # 如果有用户配置，检查用户配置；否则检查系统配置
+        if self._user_config:
+            if self._user_config.get('data_source') != 'api':
+                return []
+        elif not self.config.is_api_enabled():
             return []
         
         try:
@@ -528,7 +556,11 @@ class APIConnector:
     
     def get_environment_variables_by_app_id(self, app_id: str) -> List[EnvironmentVariable]:
         """根据应用ID获取环境变量"""
-        if not self.config.is_api_enabled():
+        # 如果有用户配置，检查用户配置；否则检查系统配置
+        if self._user_config:
+            if self._user_config.get('data_source') != 'api':
+                return []
+        elif not self.config.is_api_enabled():
             return []
         
         # 暂时禁用环境变量获取以避免404错误
@@ -537,7 +569,11 @@ class APIConnector:
     
     def test_connection(self) -> dict:
         """测试API连接是否正常"""
-        if not self.config.is_api_enabled():
+        # 如果有用户配置，检查用户配置；否则检查系统配置
+        if self._user_config:
+            if self._user_config.get('data_source') != 'api':
+                return {"success": False, "error": "API未启用"}
+        elif not self.config.is_api_enabled():
             return {"success": False, "error": "API未启用"}
         
         try:
@@ -567,7 +603,11 @@ class APIConnector:
     
     def get_app_list(self, page: int = 1, limit: int = 20) -> List[Dict[str, Any]]:
         """获取应用列表"""
-        if not self.config.is_api_enabled():
+        # 如果有用户配置，检查用户配置；否则检查系统配置
+        if self._user_config:
+            if self._user_config.get('data_source') != 'api':
+                return []
+        elif not self.config.is_api_enabled():
             return []
         
         try:
@@ -589,7 +629,11 @@ class APIConnector:
     
     def search_apps(self, query: str) -> List[Dict[str, Any]]:
         """搜索应用"""
-        if not self.config.is_api_enabled():
+        # 如果有用户配置，检查用户配置；否则检查系统配置
+        if self._user_config:
+            if self._user_config.get('data_source') != 'api':
+                return []
+        elif not self.config.is_api_enabled():
             return []
         
         try:
@@ -611,7 +655,11 @@ class APIConnector:
     
     def get_app_export_data(self, app_id: str, include_secrets: bool = False) -> Optional[str]:
         """获取应用导出数据"""
-        if not self.config.is_api_enabled():
+        # 如果有用户配置，检查用户配置；否则检查系统配置
+        if self._user_config:
+            if self._user_config.get('data_source') != 'api':
+                return None
+        elif not self.config.is_api_enabled():
             return None
         
         try:
@@ -641,7 +689,11 @@ class APIConnector:
         :param search: 搜索关键词
         :return: 包含应用列表和总数的字典
         """
-        if not self.config.is_api_enabled():
+        # 如果有用户配置，检查用户配置；否则检查系统配置
+        if self._user_config:
+            if self._user_config.get('data_source') != 'api':
+                return {"workflows": [], "total": 0}
+        elif not self.config.is_api_enabled():
             return {"workflows": [], "total": 0}
         
         try:

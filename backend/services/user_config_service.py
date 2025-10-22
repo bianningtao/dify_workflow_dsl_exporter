@@ -183,12 +183,14 @@ class UserConfigService:
             result = []
             for instance in instances:
                 auth_config = json.loads(instance.auth_config) if instance.auth_config else {}
+                # 获取auth_type的值（处理枚举和字符串两种情况）
+                auth_type_value = instance.auth_type.value if hasattr(instance.auth_type, 'value') else instance.auth_type
                 result.append({
                     'id': instance.id,
                     'name': instance.instance_name,
                     'url': instance.instance_url,
                     'auth': {
-                        'type': instance.auth_type.value,
+                        'type': auth_type_value,
                         **auth_config
                     },
                     'description': instance.description,
@@ -271,7 +273,9 @@ class UserConfigService:
                 instance.instance_url = instance_data['url']
             if 'auth' in instance_data:
                 auth_config = instance_data['auth']
-                instance.auth_type = auth_config.get('type', instance.auth_type.value)
+                # 获取当前auth_type的值（处理枚举和字符串两种情况）
+                current_auth_type = instance.auth_type.value if hasattr(instance.auth_type, 'value') else instance.auth_type
+                instance.auth_type = auth_config.get('type', current_auth_type)
                 auth_config_data = {k: v for k, v in auth_config.items() if k != 'type'}
                 instance.auth_config = json.dumps(auth_config_data)
             if 'description' in instance_data:
@@ -284,12 +288,14 @@ class UserConfigService:
             logger.info(f"更新用户目标实例: user={user_id}, instance={instance_id}")
             
             auth_config = json.loads(instance.auth_config) if instance.auth_config else {}
+            # 获取auth_type的值（处理枚举和字符串两种情况）
+            auth_type_value = instance.auth_type.value if hasattr(instance.auth_type, 'value') else instance.auth_type
             return {
                 'id': instance.id,
                 'name': instance.instance_name,
                 'url': instance.instance_url,
                 'auth': {
-                    'type': instance.auth_type.value,
+                    'type': auth_type_value,
                     **auth_config
                 },
                 'description': instance.description,

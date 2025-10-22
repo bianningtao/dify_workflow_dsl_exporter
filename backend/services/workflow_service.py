@@ -100,19 +100,36 @@ class WorkflowService:
         elif config.is_api_enabled() or self._user_api_connector:
             app_model = self._get_api_connector().get_app_by_id(app_id)
         
-        # 如果没有找到应用，创建一个默认的
+        # 如果没有找到应用，尝试从工作流中获取应用信息
         if app_model is None:
-            app_model = App(
-                id=app_id,
-                name=f"工作流应用 {app_id[:8]}",
-                mode=AppMode.WORKFLOW.value,
-                icon="🚀",
-                icon_type="emoji",
-                icon_background="#E4FBCC",
-                description="这是一个示例工作流应用",
-                use_icon_as_answer_icon=False,
-                tenant_id=str(uuid.uuid4())
-            )
+            workflow = self.get_draft_workflow(app_id)
+            if workflow and hasattr(workflow, 'app_name'):
+                # 使用工作流中的应用信息创建App对象
+                app_model = App(
+                    id=app_id,
+                    name=workflow.app_name,
+                    mode=getattr(workflow, 'app_mode', AppMode.WORKFLOW.value),
+                    icon="🚀",
+                    icon_type="emoji",
+                    icon_background="#E4FBCC",
+                    description=getattr(workflow, 'app_description', ''),
+                    use_icon_as_answer_icon=False,
+                    tenant_id=str(uuid.uuid4())
+                )
+            else:
+                # 如果还是没有找到，创建一个默认的
+                logging.warning(f"无法获取应用 {app_id} 的信息，使用默认值")
+                app_model = App(
+                    id=app_id,
+                    name=f"工作流应用 {app_id[:8]}",
+                    mode=AppMode.WORKFLOW.value,
+                    icon="🚀",
+                    icon_type="emoji",
+                    icon_background="#E4FBCC",
+                    description="这是一个示例工作流应用",
+                    use_icon_as_answer_icon=False,
+                    tenant_id=str(uuid.uuid4())
+                )
         
         return app_model
     
