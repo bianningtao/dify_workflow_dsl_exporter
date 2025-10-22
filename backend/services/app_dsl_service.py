@@ -15,11 +15,12 @@ CURRENT_DSL_VERSION = "1.0"
 
 class AppDslService:
     @classmethod
-    def export_dsl(cls, app_model: App, include_secret: bool = False) -> str:
+    def export_dsl(cls, app_model: App, include_secret: bool = False, workflow_service: WorkflowService = None) -> str:
         """
         导出应用程序DSL
         :param app_model: App实例
         :param include_secret: 是否包含secret变量
+        :param workflow_service: WorkflowService实例（可选，用于支持用户配置）
         :return: YAML格式的DSL字符串
         """
         app_mode = AppMode(app_model.mode)
@@ -39,7 +40,7 @@ class AppDslService:
         
         if app_mode in {AppMode.ADVANCED_CHAT, AppMode.WORKFLOW}:
             cls._append_workflow_export_data(
-                export_data=export_data, app_model=app_model, include_secret=include_secret
+                export_data=export_data, app_model=app_model, include_secret=include_secret, workflow_service=workflow_service
             )
         else:
             cls._append_model_config_export_data(export_data, app_model)
@@ -47,14 +48,16 @@ class AppDslService:
         return yaml.dump(export_data, allow_unicode=True, default_flow_style=False, sort_keys=False)
     
     @classmethod
-    def _append_workflow_export_data(cls, *, export_data: Dict[str, Any], app_model: App, include_secret: bool) -> None:
+    def _append_workflow_export_data(cls, *, export_data: Dict[str, Any], app_model: App, include_secret: bool, workflow_service: WorkflowService = None) -> None:
         """
         附加工作流导出数据
         :param export_data: 导出数据
         :param app_model: App实例
         :param include_secret: 是否包含secret变量
+        :param workflow_service: WorkflowService实例（可选，用于支持用户配置）
         """
-        workflow_service = WorkflowService()
+        if workflow_service is None:
+            workflow_service = WorkflowService()
         workflow = workflow_service.get_draft_workflow(app_model.id)
         
         if not workflow:

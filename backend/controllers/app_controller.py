@@ -6,8 +6,11 @@ from services.workflow_service import WorkflowService
 from services.config_service import config
 from services.database_connector import database_connector
 from services.api_connector import api_connector
-
+from middleware.auth_middleware import token_required
+import logging
 import uuid
+
+logger = logging.getLogger(__name__)
 
 class AppExportApi(Resource):
     def get(self, app_id):
@@ -17,18 +20,35 @@ class AppExportApi(Resource):
         parser.add_argument("include_secret", type=bool, default=False, location="args")
         args = parser.parse_args()
         
+        # 尝试获取用户ID（如果有认证token）
+        user_id = None
+        try:
+            auth_header = request.headers.get('Authorization')
+            if auth_header and auth_header.startswith('Bearer '):
+                from services.auth_service import auth_service
+                token = auth_header[7:]
+                payload = auth_service.verify_token(token)
+                if payload:
+                    user_id = payload.get('user_id')
+                    logger.info(f"用户 {user_id} 请求导出应用 {app_id}")
+        except Exception as e:
+            logger.warning(f"解析认证token失败: {e}")
+        
+        # 创建WorkflowService实例（支持用户配置）
+        workflow_service = WorkflowService(user_id=user_id)
+        
         # 获取或创建应用模型
-        app_model = self._get_or_create_app_model(app_id)
+        app_model = self._get_or_create_app_model(app_id, workflow_service)
         
         # 获取工作流信息
-        workflow_service = WorkflowService()
         workflow = workflow_service.get_draft_workflow(app_id)
         
         try:
             # 导出DSL
             dsl_data = AppDslService.export_dsl(
                 app_model=app_model, 
-                include_secret=args["include_secret"]
+                include_secret=args["include_secret"],
+                workflow_service=workflow_service
             )
             
             # 生成文件名 - 使用工作流名称
@@ -51,28 +71,7 @@ class AppExportApi(Resource):
         except Exception as e:
             return {"error": str(e)}, 500
     
-    def _get_or_create_app_model(self, app_id: str) -> App:
+    def _get_or_create_app_model(self, app_id: str, workflow_service: WorkflowService) -> App:
         """获取或创建应用模型"""
-        # 根据配置选择数据源
-        if config.is_database_enabled():
-            app_model = database_connector.get_app_by_id(app_id)
-        elif config.is_api_enabled():
-            app_model = api_connector.get_app_by_id(app_id)
-        else:
-            app_model = None
-        
-        # 如果没有找到应用，创建一个默认的
-        if app_model is None:
-            app_model = App(
-                id=app_id,
-                name=f"工作流应用 {app_id[:8]}",
-                mode=AppMode.WORKFLOW.value,
-                icon="🚀",
-                icon_type="emoji",
-                icon_background="#E4FBCC",
-                description="这是一个示例工作流应用",
-                use_icon_as_answer_icon=False,
-                tenant_id=str(uuid.uuid4())
-            )
-        
-        return app_model 
+        # 使用WorkflowService的方法，它会自动处理用户配置
+        return workflow_service.get_or_create_app_model(app_id) 

@@ -149,4 +149,9 @@ config_db.yaml
 
 # Workflow export files
 workflow-*.yml
-workflows-export-*.zip 
+workflows-export-*.zip
+
+# Docker deployment files (本地部署文件，包含敏感配置)
+docker/
+!docker/.gitkeep
+!docker/README.md 

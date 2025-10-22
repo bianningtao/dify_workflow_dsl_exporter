@@ -227,7 +227,8 @@ class WorkflowBatchExportApi(Resource):
                     # 导出DSL
                     dsl_data = AppDslService.export_dsl(
                         app_model=app_model,
-                        include_secret=args["include_secret"]
+                        include_secret=args["include_secret"],
+                        workflow_service=workflow_service
                     )
                     
                     # 生成文件名 - 使用工作流名称
