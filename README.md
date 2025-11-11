@@ -157,7 +157,12 @@ npm run dev
 ![alt text](https://github.com/bianningtao/dify_workflow_dsl_exporter/blob/main/images/image2.png)
 ![alt text](https://github.com/bianningtao/dify_workflow_dsl_exporter/blob/main/images/image3.png)
 
+![alt text](https://github.com/bianningtao/images/blob/main/images/config-1.png)
+
+![alt text](https://github.com/bianningtao/images/blob/main/images/config-2.png)
+
 ## ⚙️ 配置系统
+【新】目前已经支持在界面上配置连接信息，推荐使用token连接，具体见上方图片
 
 本项目支持两种数据源模式，可以通过配置文件灵活切换：
 
