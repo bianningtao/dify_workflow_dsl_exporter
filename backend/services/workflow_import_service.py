@@ -18,10 +18,72 @@ logger = logging.getLogger(__name__)
 class WorkflowImportService:
     """工作流导入服务类"""
     
+    # agent-chat 和 chat 类型应用的默认 model_config 模板
+    DEFAULT_MODEL_CONFIG_TEMPLATE = {
+        'pre_prompt': '',
+        'prompt_type': 'simple',
+        'chat_prompt_config': {},
+        'completion_prompt_config': {},
+        'user_input_form': [],
+        'dataset_query_variable': '',
+        'opening_statement': '',
+        'suggested_questions': [],
+        'more_like_this': {'enabled': False},
+        'suggested_questions_after_answer': {'enabled': False},
+        'speech_to_text': {'enabled': False},
+        'text_to_speech': {'enabled': False, 'voice': '', 'language': ''},
+        'retriever_resource': {'enabled': False},
+        'sensitive_word_avoidance': {'enabled': False},
+        'file_upload': {'image': {'enabled': False, 'number_limits': 3, 'detail': 'high', 'transfer_methods': ['remote_url', 'local_file']}},
+        'agent_mode': {'enabled': True, 'max_iteration': 5, 'strategy': 'function_call', 'tools': []},
+    }
+    
     def __init__(self):
         self.timeout = 30
         self.retry_count = 3
         self.retry_delay = 1
+    
+    def _fix_incomplete_dsl(self, yaml_content: str) -> tuple[str, List[str]]:
+        """
+        修复不完整的 DSL 文件，自动补全缺失的必要字段
+        
+        Args:
+            yaml_content: 原始 YAML 内容
+            
+        Returns:
+            (修复后的 YAML 内容, 修复信息列表)
+        """
+        fixes = []
+        
+        try:
+            yaml_data = yaml.safe_load(yaml_content)
+            if not yaml_data:
+                return yaml_content, fixes
+            
+            app_mode = yaml_data.get('app', {}).get('mode', '')
+            model_config = yaml_data.get('model_config', {})
+            
+            # 只处理 agent-chat 和 chat 类型的应用
+            if app_mode in ['agent-chat', 'chat']:
+                modified = False
+                
+                # 检查并补全缺失的必要字段
+                for key, default_value in self.DEFAULT_MODEL_CONFIG_TEMPLATE.items():
+                    if key not in model_config:
+                        model_config[key] = default_value
+                        fixes.append(f"补全缺失字段: model_config.{key}")
+                        modified = True
+                
+                if modified:
+                    yaml_data['model_config'] = model_config
+                    # 重新生成 YAML 内容
+                    yaml_content = yaml.dump(yaml_data, allow_unicode=True, default_flow_style=False, sort_keys=False)
+                    logger.info(f"DSL 文件已自动修复，补全了 {len(fixes)} 个字段")
+            
+        except Exception as e:
+            logger.warning(f"尝试修复 DSL 时发生错误: {e}")
+        
+        return yaml_content, fixes
     
     def _get_instance_config(self, target_instance_id: str, user_id: str = None) -> tuple[Optional[Dict[str, Any]], Optional[Dict[str, str]], Optional[str]]:
         """
@@ -99,6 +161,15 @@ class WorkflowImportService:
                     'success': False,
                     'error': f'目标实例 {target_instance_id} 不存在'
                 }
+            
+            # 自动修复不完整的 DSL 文件
+            yaml_content = import_data.get('yaml_content')
+            if yaml_content:
+                fixed_content, fixes = self._fix_incomplete_dsl(yaml_content)
+                if fixes:
+                    logger.info(f"DSL 已自动修复: {', '.join(fixes[:3])}{'...' if len(fixes) > 3 else ''}")
+                    import_data = dict(import_data)  # 创建副本避免修改原数据
+                    import_data['yaml_content'] = fixed_content
             
             # 构建导入URL
             if user_id:
@@ -270,14 +341,19 @@ class WorkflowImportService:
             logger.info(f"正在导入工作流文件: {filename}")
             
             try:
+                # 自动修复不完整的 DSL 文件
+                fixed_content, fixes = self._fix_incomplete_dsl(content)
+                if fixes:
+                    logger.info(f"文件 {filename} 已自动修复: {', '.join(fixes[:3])}{'...' if len(fixes) > 3 else ''}")
+                
                 # 解析YAML内容以获取应用信息
-                yaml_data = yaml.safe_load(content)
+                yaml_data = yaml.safe_load(fixed_content)
                 app_info = yaml_data.get('app', {})
                 
                 # 构建导入数据
                 import_data = {
                     'mode': 'yaml-content',
-                    'yaml_content': content,
+                    'yaml_content': fixed_content,
                     'name': workflow_file.get('name') or app_info.get('name'),
                     'description': workflow_file.get('description') or app_info.get('description'),
                     'icon_type': app_info.get('icon_type', 'emoji'),
